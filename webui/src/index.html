@@ -6,15 +6,15 @@
     <title>Device Manager</title>
     <link rel="stylesheet" href="/assets/output.css">
 </head>
-<body class="bg-gray-50 text-gray-900">
+<body class="bg-gray-50 text-gray-900 dark:bg-gray-900 dark:text-gray-100">
     <div x-data="deviceManager" class="min-h-screen">
         <!-- Header -->
-        <div class="bg-white shadow-sm border-b border-gray-200">
+        <div class="bg-white shadow-sm border-b border-gray-200 dark:bg-gray-800 dark:border-gray-700">
             <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
                 <div class="flex items-center justify-between">
-                    <h1 class="text-3xl font-bold text-blue-600">Device Manager</h1>
+                    <h1 class="text-3xl font-bold text-blue-600 dark:text-blue-400">Device Manager</h1>
                     <button @click="openAddModal()"
-                        class="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+                        class="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors dark:bg-blue-500 dark:hover:bg-blue-600">
                         <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
                         </svg>
@@ -26,18 +26,18 @@
 
         <!-- Search Bar -->
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-            <div class="bg-white rounded-lg shadow p-4 mb-6">
+            <div class="bg-white rounded-lg shadow p-4 mb-6 dark:bg-gray-800">
                 <div class="flex flex-col sm:flex-row gap-3">
                     <input type="text" x-model="searchQuery" @keyup.enter="loadDevices()"
                         placeholder="Search devices by name, IP, tags..."
-                        class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
+                        class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white text-gray-900 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 dark:placeholder-gray-400">
                     <div class="flex gap-2">
                         <button @click="loadDevices()"
-                            class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+                            class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors dark:bg-blue-500 dark:hover:bg-blue-600">
                             Search
                         </button>
                         <button @click="clearSearch()" x-show="searchQuery"
-                            class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors">
+                            class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600">
                             Clear
                         </button>
                     </div>
@@ -46,75 +46,75 @@
 
             <!-- Loading State -->
             <div x-show="loading" class="text-center py-12">
-                <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-blue-600 border-t-transparent"></div>
-                <p class="mt-2 text-gray-600">Loading devices...</p>
+                <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-blue-600 border-t-transparent dark:border-blue-400"></div>
+                <p class="mt-2 text-gray-600 dark:text-gray-400">Loading devices...</p>
             </div>
 
             <!-- Empty State -->
             <div x-show="!loading && devices.length === 0" class="text-center py-16">
-                <svg class="mx-auto h-16 w-16 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg class="mx-auto h-16 w-16 text-gray-400 dark:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z"/>
                 </svg>
-                <h3 class="mt-2 text-lg font-medium text-gray-900">No devices found</h3>
-                <p class="mt-1 text-gray-500">Get started by adding your first device.</p>
+                <h3 class="mt-2 text-lg font-medium text-gray-900 dark:text-gray-100">No devices found</h3>
+                <p class="mt-1 text-gray-500 dark:text-gray-400">Get started by adding your first device.</p>
             </div>
 
             <!-- Device List Table -->
-            <div x-show="!loading" class="bg-white rounded-lg shadow overflow-hidden">
+            <div x-show="!loading" class="bg-white rounded-lg shadow overflow-hidden dark:bg-gray-800">
                 <div class="overflow-x-auto">
-                    <table class="min-w-full divide-y divide-gray-200">
-                        <thead class="bg-gray-50">
+                    <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                        <thead class="bg-gray-50 dark:bg-gray-700">
                             <tr>
-                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
-                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Details</th>
-                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Location</th>
-                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Addresses</th>
-                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tags</th>
-                                <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-gray-300">Name</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-gray-300">Details</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-gray-300">Location</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-gray-300">Addresses</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-gray-300">Tags</th>
+                                <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-gray-300">Actions</th>
                             </tr>
                         </thead>
-                        <tbody class="bg-white divide-y divide-gray-200">
+                        <tbody class="bg-white divide-y divide-gray-200 dark:bg-gray-800 dark:divide-gray-700">
                             <template x-for="device in devices" :key="device.id">
-                                <tr class="hover:bg-gray-50 transition-colors">
+                                <tr class="hover:bg-gray-50 transition-colors dark:hover:bg-gray-700">
                                     <td class="px-6 py-4 whitespace-nowrap">
-                                        <div class="text-sm font-medium text-gray-900 cursor-pointer hover:text-blue-600" @click="viewDevice(device.id)" x-text="device.name"></div>
+                                        <div class="text-sm font-medium text-gray-900 cursor-pointer hover:text-blue-600 dark:text-gray-100 dark:hover:text-blue-400" @click="viewDevice(device.id)" x-text="device.name"></div>
                                         <div class="text-xs text-gray-400 font-mono" x-show="device.id" x-text="device.id"></div>
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap">
-                                        <div class="text-sm text-gray-600">
+                                        <div class="text-sm text-gray-600 dark:text-gray-300">
                                             <div x-show="device.make_model" x-text="device.make_model"></div>
-                                            <div x-show="device.os" class="text-gray-400" x-text="device.os"></div>
-                                            <div x-show="!device.make_model && !device.os" class="text-gray-400">—</div>
+                                            <div x-show="device.os" class="text-gray-400 dark:text-gray-500" x-text="device.os"></div>
+                                            <div x-show="!device.make_model && !device.os" class="text-gray-400 dark:text-gray-500">—</div>
                                         </div>
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap">
-                                        <div class="text-sm text-gray-600" x-show="device.location" x-text="device.location"></div>
-                                        <div class="text-sm text-gray-400" x-show="!device.location">—</div>
+                                        <div class="text-sm text-gray-600 dark:text-gray-300" x-show="device.location" x-text="device.location"></div>
+                                        <div class="text-sm text-gray-400 dark:text-gray-500" x-show="!device.location">—</div>
                                     </td>
                                     <td class="px-6 py-4">
-                                        <div class="text-sm text-gray-600 space-y-1">
+                                        <div class="text-sm text-gray-600 space-y-1 dark:text-gray-300">
                                             <template x-for="addr in device.addresses" :key="addr.ip">
                                                 <div class="font-mono text-xs">
                                                     <span x-text="addr.ip"></span>
                                                     <span x-show="addr.port" x-text="':' + addr.port"></span>
-                                                    <span x-show="addr.label" class="text-gray-400" x-text="' (' + addr.label + ')'"></span>
+                                                    <span x-show="addr.label" class="text-gray-400 dark:text-gray-500" x-text="' (' + addr.label + ')'"></span>
                                                 </div>
                                             </template>
-                                            <div x-show="!device.addresses || device.addresses.length === 0" class="text-gray-400">—</div>
+                                            <div x-show="!device.addresses || device.addresses.length === 0" class="text-gray-400 dark:text-gray-500">—</div>
                                         </div>
                                     </td>
                                     <td class="px-6 py-4">
                                         <div x-show="device.tags && device.tags.length > 0" class="flex flex-wrap gap-1">
                                             <template x-for="tag in device.tags" :key="tag">
-                                                <span class="inline-flex items-center px-2 py-0.5 bg-blue-100 text-blue-800 text-xs font-medium rounded-full" x-text="tag"></span>
+                                                <span class="inline-flex items-center px-2 py-0.5 bg-blue-100 text-blue-800 text-xs font-medium rounded-full dark:bg-blue-900 dark:text-blue-200" x-text="tag"></span>
                                             </template>
                                         </div>
-                                        <div x-show="!device.tags || device.tags.length === 0" class="text-sm text-gray-400">—</div>
+                                        <div x-show="!device.tags || device.tags.length === 0" class="text-sm text-gray-400 dark:text-gray-500">—</div>
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                        <button @click="viewDevice(device.id)" class="text-blue-600 hover:text-blue-900 mr-3">View</button>
-                                        <button @click="editDevice(device.id)" class="text-indigo-600 hover:text-indigo-900 mr-3">Edit</button>
-                                        <button @click="deleteDeviceFromList(device.id)" class="text-red-600 hover:text-red-900">Delete</button>
+                                        <button @click="viewDevice(device.id)" class="text-blue-600 hover:text-blue-900 mr-3 dark:text-blue-400 dark:hover:text-blue-300">View</button>
+                                        <button @click="editDevice(device.id)" class="text-indigo-600 hover:text-indigo-900 mr-3 dark:text-indigo-400 dark:hover:text-indigo-300">Edit</button>
+                                        <button @click="deleteDeviceFromList(device.id)" class="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300">Delete</button>
                                     </td>
                                 </tr>
                             </template>
@@ -129,16 +129,16 @@
             <div class="flex min-h-screen items-center justify-center p-4">
                 <div x-show="showModal" x-transition:enter="ease-out duration-300" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
                     x-transition:leave="ease-in duration-200" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"
-                    @click="closeModal()" class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity"></div>
+                    @click="closeModal()" class="fixed inset-0 bg-gray-900/20 backdrop-blur-sm transition-opacity dark:bg-gray-900/50"></div>
                 <div x-show="showModal" x-transition:enter="ease-out duration-300" x-transition:enter-start="opacity-0 scale-95"
                     x-transition:enter-end="opacity-100 scale-100" x-transition:leave="ease-in duration-200"
                     x-transition:leave-start="opacity-100 scale-100" x-transition:leave-end="opacity-0 scale-95"
-                    class="relative z-10 w-full max-w-lg bg-white rounded-lg shadow-xl">
+                    class="relative z-10 w-full max-w-lg bg-white rounded-lg shadow-xl dark:bg-gray-800">
                     <div class="flex flex-col max-h-[90vh]">
                         <!-- Header -->
-                        <div class="flex items-center justify-between border-b border-gray-200 px-6 py-4">
-                            <h3 class="text-lg font-semibold text-gray-900" x-text="modalTitle"></h3>
-                            <button type="button" @click="closeModal()" class="text-gray-400 hover:text-gray-500">
+                        <div class="flex items-center justify-between border-b border-gray-200 px-6 py-4 dark:border-gray-700">
+                            <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100" x-text="modalTitle"></h3>
+                            <button type="button" @click="closeModal()" class="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300">
                                 <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
                                 </svg>
@@ -149,60 +149,60 @@
                             <form @submit.prevent="saveDevice" class="space-y-4">
                                 <input type="hidden" x-model="form.id">
                                 <div>
-                                    <label class="block text-sm font-medium text-gray-700">Name *</label>
+                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Name *</label>
                                     <input type="text" x-model="form.name" required
-                                        class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
+                                        class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white text-gray-900 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100">
                                 </div>
                                 <div>
-                                    <label class="block text-sm font-medium text-gray-700">Description</label>
+                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Description</label>
                                     <textarea x-model="form.description" rows="2"
-                                        class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"></textarea>
+                                        class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white text-gray-900 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"></textarea>
                                 </div>
                                 <div class="grid grid-cols-2 gap-4">
                                     <div>
-                                        <label class="block text-sm font-medium text-gray-700">Make/Model</label>
+                                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Make/Model</label>
                                         <input type="text" x-model="form.make_model"
-                                            class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
+                                            class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white text-gray-900 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100">
                                     </div>
                                     <div>
-                                        <label class="block text-sm font-medium text-gray-700">OS</label>
+                                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">OS</label>
                                         <input type="text" x-model="form.os"
-                                            class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
+                                            class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white text-gray-900 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100">
                                     </div>
                                 </div>
                                 <div>
-                                    <label class="block text-sm font-medium text-gray-700">Location</label>
+                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Location</label>
                                     <input type="text" x-model="form.location"
-                                        class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
+                                        class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white text-gray-900 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100">
                                 </div>
                                 <div>
-                                    <label class="block text-sm font-medium text-gray-700">Tags (comma-separated)</label>
+                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Tags (comma-separated)</label>
                                     <input type="text" x-model="form.tagsInput" placeholder="server, production, web"
-                                        class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
+                                        class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white text-gray-900 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100">
                                 </div>
                                 <div>
-                                    <label class="block text-sm font-medium text-gray-700">Domains (comma-separated)</label>
+                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Domains (comma-separated)</label>
                                     <input type="text" x-model="form.domainsInput" placeholder="example.com, www.example.com"
-                                        class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
+                                        class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white text-gray-900 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100">
                                 </div>
                                 <div>
-                                    <label class="block text-sm font-medium text-gray-700">Addresses</label>
+                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Addresses</label>
                                     <div class="space-y-2 mt-1">
                                         <template x-for="(addr, index) in form.addresses" :key="index">
                                             <div class="flex gap-2 items-center flex-wrap">
                                                 <input type="text" x-model="addr.ip" placeholder="IP Address" required
-                                                    class="flex-1 min-w-[150px] px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm">
+                                                    class="flex-1 min-w-[150px] px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm bg-white text-gray-900 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100">
                                                 <input type="number" x-model="addr.port" placeholder="Port"
-                                                    class="w-20 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm">
+                                                    class="w-20 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm bg-white text-gray-900 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100">
                                                 <select x-model="addr.type"
-                                                    class="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm">
+                                                    class="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm bg-white text-gray-900 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100">
                                                     <option value="ipv4">IPv4</option>
                                                     <option value="ipv6">IPv6</option>
                                                 </select>
                                                 <input type="text" x-model="addr.label" placeholder="Label"
-                                                    class="w-24 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm">
+                                                    class="w-24 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm bg-white text-gray-900 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100">
                                                 <button type="button" @click="removeAddress(index)"
-                                                    class="px-3 py-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition-colors shrink-0">
+                                                    class="px-3 py-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition-colors shrink-0 dark:bg-red-900 dark:text-red-300 dark:hover:bg-red-800">
                                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
                                                     </svg>
@@ -210,7 +210,7 @@
                                             </div>
                                         </template>
                                         <button type="button" @click="addAddress()"
-                                            class="w-full px-3 py-2 border border-dashed border-gray-300 rounded-lg text-gray-600 hover:border-blue-400 hover:text-blue-600 transition-colors text-sm">
+                                            class="w-full px-3 py-2 border border-dashed border-gray-300 rounded-lg text-gray-600 hover:border-blue-400 hover:text-blue-600 transition-colors text-sm dark:border-gray-600 dark:text-gray-400 dark:hover:border-blue-500 dark:hover:text-blue-400">
                                             + Add Address
                                         </button>
                                     </div>
@@ -218,15 +218,15 @@
                             </form>
                         </div>
                         <!-- Footer with Buttons -->
-                        <div class="border-t border-gray-200 px-6 py-4 bg-gray-50">
+                        <div class="border-t border-gray-200 px-6 py-4 bg-gray-50 dark:border-gray-700 dark:bg-gray-900">
                             <div class="flex gap-3">
                                 <button type="submit" @click="saveDevice" :disabled="saving"
-                                    class="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+                                    class="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors dark:bg-blue-500 dark:hover:bg-blue-600">
                                     <span x-show="!saving">Save</span>
                                     <span x-show="saving">Saving...</span>
                                 </button>
                                 <button type="button" @click="closeModal()"
-                                    class="flex-1 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors">
+                                    class="flex-1 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600">
                                     Cancel
                                 </button>
                             </div>
@@ -241,16 +241,16 @@
             <div class="flex min-h-screen items-center justify-center p-4">
                 <div x-show="showViewModal" x-transition:enter="ease-out duration-300" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
                     x-transition:leave="ease-in duration-200" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"
-                    @click="closeViewModal()" class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity"></div>
+                    @click="closeViewModal()" class="fixed inset-0 bg-gray-900/20 backdrop-blur-sm transition-opacity dark:bg-gray-900/50"></div>
                 <div x-show="showViewModal" x-transition:enter="ease-out duration-300" x-transition:enter-start="opacity-0 scale-95"
                     x-transition:enter-end="opacity-100 scale-100" x-transition:leave="ease-in duration-200"
                     x-transition:leave-start="opacity-100 scale-100" x-transition:leave-end="opacity-0 scale-95"
-                    class="relative z-10 w-full max-w-lg bg-white rounded-lg shadow-xl">
+                    class="relative z-10 w-full max-w-lg bg-white rounded-lg shadow-xl dark:bg-gray-800">
                     <div class="flex flex-col max-h-[90vh]">
                         <!-- Header -->
-                        <div class="flex items-center justify-between border-b border-gray-200 px-6 py-4">
-                            <h3 class="text-lg font-semibold text-gray-900">Device Details</h3>
-                            <button type="button" @click="closeViewModal()" class="text-gray-400 hover:text-gray-500">
+                        <div class="flex items-center justify-between border-b border-gray-200 px-6 py-4 dark:border-gray-700">
+                            <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Device Details</h3>
+                            <button type="button" @click="closeViewModal()" class="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300">
                                 <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
                                 </svg>
@@ -260,75 +260,75 @@
                         <div class="flex-1 overflow-y-auto px-6 py-4">
                             <div class="space-y-4">
                                 <div>
-                                    <p class="text-sm font-medium text-gray-500">Name</p>
-                                    <p class="mt-1 text-gray-900" x-text="currentDevice.name"></p>
+                                    <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Name</p>
+                                    <p class="mt-1 text-gray-900 dark:text-gray-100" x-text="currentDevice.name"></p>
                                 </div>
                                 <div x-show="currentDevice.description">
-                                    <p class="text-sm font-medium text-gray-500">Description</p>
-                                    <p class="mt-1 text-gray-900 whitespace-pre-wrap" x-text="currentDevice.description"></p>
+                                    <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Description</p>
+                                    <p class="mt-1 text-gray-900 dark:text-gray-100 whitespace-pre-wrap" x-text="currentDevice.description"></p>
                                 </div>
                                 <div class="grid grid-cols-2 gap-4">
                                     <div x-show="currentDevice.make_model">
-                                        <p class="text-sm font-medium text-gray-500">Make/Model</p>
-                                        <p class="mt-1 text-gray-900" x-text="currentDevice.make_model"></p>
+                                        <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Make/Model</p>
+                                        <p class="mt-1 text-gray-900 dark:text-gray-100" x-text="currentDevice.make_model"></p>
                                     </div>
                                     <div x-show="currentDevice.os">
-                                        <p class="text-sm font-medium text-gray-500">OS</p>
-                                        <p class="mt-1 text-gray-900" x-text="currentDevice.os"></p>
+                                        <p class="text-sm font-medium text-gray-500 dark:text-gray-400">OS</p>
+                                        <p class="mt-1 text-gray-900 dark:text-gray-100" x-text="currentDevice.os"></p>
                                     </div>
                                 </div>
                                 <div x-show="currentDevice.location">
-                                    <p class="text-sm font-medium text-gray-500">Location</p>
-                                    <p class="mt-1 text-gray-900" x-text="currentDevice.location"></p>
+                                    <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Location</p>
+                                    <p class="mt-1 text-gray-900 dark:text-gray-100" x-text="currentDevice.location"></p>
                                 </div>
                                 <div x-show="currentDevice.addresses && currentDevice.addresses.length > 0">
-                                    <p class="text-sm font-medium text-gray-500">Addresses</p>
+                                    <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Addresses</p>
                                     <div class="mt-1 space-y-1">
                                         <template x-for="addr in currentDevice.addresses" :key="addr.ip">
-                                            <p class="text-gray-900">
+                                            <p class="text-gray-900 dark:text-gray-100">
                                                 <span x-text="addr.ip"></span>
                                                 <span x-show="addr.port" x-text="':' + addr.port"></span>
-                                                <span x-show="addr.label" class="text-gray-500" x-text="' (' + addr.label + ')'"></span>
-                                                <span class="text-xs bg-gray-100 px-2 py-0.5 rounded text-gray-600" x-text="addr.type"></span>
+                                                <span x-show="addr.label" class="text-gray-500 dark:text-gray-400" x-text="' (' + addr.label + ')'"></span>
+                                                <span class="text-xs bg-gray-100 px-2 py-0.5 rounded text-gray-600 dark:bg-gray-700 dark:text-gray-300" x-text="addr.type"></span>
                                             </p>
                                         </template>
                                     </div>
                                 </div>
                                 <div x-show="currentDevice.domains && currentDevice.domains.length > 0">
-                                    <p class="text-sm font-medium text-gray-500">Domains</p>
+                                    <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Domains</p>
                                     <div class="mt-1 space-y-1">
                                         <template x-for="domain in currentDevice.domains" :key="domain">
-                                            <p class="text-gray-900" x-text="domain"></p>
+                                            <p class="text-gray-900 dark:text-gray-100" x-text="domain"></p>
                                         </template>
                                     </div>
                                 </div>
                                 <div x-show="currentDevice.tags && currentDevice.tags.length > 0">
-                                    <p class="text-sm font-medium text-gray-500">Tags</p>
+                                    <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Tags</p>
                                     <div class="mt-2 flex flex-wrap gap-2">
                                         <template x-for="tag in currentDevice.tags" :key="tag">
-                                            <span class="inline-flex items-center px-2.5 py-0.5 bg-blue-100 text-blue-800 text-sm font-medium rounded-full" x-text="tag"></span>
+                                            <span class="inline-flex items-center px-2.5 py-0.5 bg-blue-100 text-blue-800 text-sm font-medium rounded-full dark:bg-blue-900 dark:text-blue-200" x-text="tag"></span>
                                         </template>
                                     </div>
                                 </div>
                                 <div>
-                                    <p class="text-sm font-medium text-gray-500">ID</p>
-                                    <p class="mt-1 text-sm text-gray-500 font-mono break-all" x-text="currentDevice.id"></p>
+                                    <p class="text-sm font-medium text-gray-500 dark:text-gray-400">ID</p>
+                                    <p class="mt-1 text-sm text-gray-500 font-mono break-all dark:text-gray-400" x-text="currentDevice.id"></p>
                                 </div>
                             </div>
                         </div>
                         <!-- Footer with Buttons -->
-                        <div class="border-t border-gray-200 px-6 py-4 bg-gray-50">
+                        <div class="border-t border-gray-200 px-6 py-4 bg-gray-50 dark:border-gray-700 dark:bg-gray-900">
                             <div class="flex gap-3">
                                 <button @click="editCurrentDevice()"
-                                    class="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+                                    class="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors dark:bg-blue-500 dark:hover:bg-blue-600">
                                     Edit
                                 </button>
                                 <button @click="deleteCurrentDevice()"
-                                    class="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors">
+                                    class="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors dark:bg-red-500 dark:hover:bg-red-600">
                                     Delete
                                 </button>
                                 <button @click="closeViewModal()"
-                                    class="flex-1 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors">
+                                    class="flex-1 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600">
                                     Close
                                 </button>
                             </div>

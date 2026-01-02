@@ -6,3 +6,5 @@
   --color-danger: #dc2626;
   --color-danger-hover: #b91c1c;
 }
+
+/* Dark mode is automatically enabled via prefers-color-scheme media query */
