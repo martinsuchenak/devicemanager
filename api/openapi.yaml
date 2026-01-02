@@ -10,10 +10,15 @@ info:
     - Search functionality across all device properties
     - Tag-based filtering
     - Support for multiple network addresses per device
+    - Device relationships (SQLite storage backend)
 
     **Authentication:**
     The API does not require authentication by default. Bearer token authentication
     can be enabled via the `DM_BEARER_TOKEN` environment variable on the server.
+
+    **Storage Backends:**
+    - SQLite (default): Full feature support including device relationships
+    - File-based (json/toml): Basic CRUD operations, no relationship support
   version: 1.0.0
   contact:
     name: Device Manager
@@ -31,6 +36,8 @@ tags:
     description: Device management operations
   - name: search
     description: Search operations
+  - name: relationships
+    description: Device relationship operations (SQLite only)
 
 paths:
   /devices:
@@ -252,6 +259,219 @@ paths:
         '500':
           $ref: '#/components/responses/Error'
 
+  /devices/{id}/relationships:
+    parameters:
+      - name: id
+        in: path
+        description: Device ID or unique name
+        required: true
+        schema:
+          type: string
+        example: web-server-01-20250102120000
+
+    get:
+      summary: Get device relationships
+      description: |
+        Retrieve all relationships for a specific device. Returns both
+        parent and child relationships. Only available with SQLite storage.
+      operationId: getDeviceRelationships
+      tags:
+        - relationships
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Relationship'
+              example:
+                - parent_id: switch-core-01-20250102120000
+                  child_id: web-server-01-20250102120000
+                  relationship_type: connected_to
+                  created_at: '2025-01-02T12:00:00Z'
+                - parent_id: web-server-01-20250102120000
+                  child_id: database-01-20250102120000
+                  relationship_type: depends_on
+                  created_at: '2025-01-02T12:05:00Z'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '501':
+          description: Relationships not supported by storage backend
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: relationships are not supported by this storage backend
+        '500':
+          $ref: '#/components/responses/Error'
+
+    post:
+      summary: Add a relationship
+      description: |
+        Create a new relationship between two devices. The device in the path
+        becomes the parent, and the device in the request body becomes the child.
+        Only available with SQLite storage.
+      operationId: addRelationship
+      tags:
+        - relationships
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RelationshipInput'
+            examples:
+              depends_on:
+                summary: Dependency relationship
+                value:
+                  child_id: database-01-20250102120000
+                  relationship_type: depends_on
+              connected_to:
+                summary: Network connection
+                value:
+                  child_id: switch-core-01-20250102120000
+                  relationship_type: connected_to
+      responses:
+        '201':
+          description: Relationship created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  parent_id:
+                    type: string
+                  child_id:
+                    type: string
+                  relationship_type:
+                    type: string
+                example:
+                  message: relationship created
+                  parent_id: web-server-01-20250102120000
+                  child_id: database-01-20250102120000
+                  relationship_type: depends_on
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '501':
+          description: Relationships not supported by storage backend
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: relationships are not supported by this storage backend
+        '500':
+          $ref: '#/components/responses/Error'
+
+  /devices/{id}/related:
+    parameters:
+      - name: id
+        in: path
+        description: Device ID or unique name
+        required: true
+        schema:
+          type: string
+        example: web-server-01-20250102120000
+
+    get:
+      summary: Get related devices
+      description: |
+        Retrieve all devices related to the specified device. Optionally filter
+        by relationship type. Only available with SQLite storage.
+      operationId: getRelatedDevices
+      tags:
+        - relationships
+      parameters:
+        - name: type
+          in: query
+          description: Filter by relationship type (optional)
+          schema:
+            type: string
+            enum: [depends_on, connected_to, contains, related]
+            example: depends_on
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Device'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '501':
+          description: Relationships not supported by storage backend
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: relationships are not supported by this storage backend
+        '500':
+          $ref: '#/components/responses/Error'
+
+  /devices/{parentId}/relationships/{childId}/{relationshipType}:
+    parameters:
+      - name: parentId
+        in: path
+        description: Parent device ID or unique name
+        required: true
+        schema:
+          type: string
+        example: web-server-01-20250102120000
+      - name: childId
+        in: path
+        description: Child device ID or unique name
+        required: true
+        schema:
+          type: string
+        example: database-01-20250102120000
+      - name: relationshipType
+        in: path
+        description: Type of relationship to remove
+        required: true
+        schema:
+          type: string
+          example: depends_on
+
+    delete:
+      summary: Remove a relationship
+      description: |
+        Delete a specific relationship between two devices. Only available
+        with SQLite storage.
+      operationId: removeRelationship
+      tags:
+        - relationships
+      responses:
+        '204':
+          description: Relationship removed successfully
+        '404':
+          description: Device or relationship not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: device or relationship not found
+        '501':
+          description: Relationships not supported by storage backend
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: relationships are not supported by this storage backend
+        '500':
+          $ref: '#/components/responses/Error'
+
 components:
   schemas:
     Device:
@@ -383,6 +603,51 @@ components:
           description: Optional label for the address (e.g., "management", "data")
           example: management
 
+    Relationship:
+      type: object
+      description: A relationship between two devices
+      required:
+        - parent_id
+        - child_id
+        - relationship_type
+        - created_at
+      properties:
+        parent_id:
+          type: string
+          description: Parent device ID
+          example: web-server-01-20250102120000
+        child_id:
+          type: string
+          description: Child device ID
+          example: database-01-20250102120000
+        relationship_type:
+          type: string
+          description: Type of relationship
+          enum: [depends_on, connected_to, contains, related]
+          example: depends_on
+        created_at:
+          type: string
+          format: date-time
+          description: When the relationship was created
+          readOnly: true
+
+    RelationshipInput:
+      type: object
+      description: Input for creating a relationship between devices
+      required:
+        - child_id
+      properties:
+        child_id:
+          type: string
+          description: Child device ID or name
+          example: database-01-20250102120000
+        relationship_type:
+          type: string
+          description: Type of relationship
+          enum: [depends_on, connected_to, contains, related]
+          default: related
+          example: depends_on
+
     Error:
       type: object
       description: Error response
@@ -419,6 +684,15 @@ components:
             $ref: '#/components/schemas/Error'
           example:
             error: Internal server error
+
+    NotImplemented:
+      description: Feature not supported by storage backend
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: relationships are not supported by this storage backend
 
     NotFound:
       description: Resource not found

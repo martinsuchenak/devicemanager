@@ -78,6 +78,45 @@ func (s *Server) registerTools() {
 		),
 		s.handleDeviceDelete,
 	)
+
+	// Relationship tools (SQLite only)
+
+	// device_add_relationship - Add a relationship between two devices
+	s.mcpServer.RegisterTool(
+		mcp.NewTool("device_add_relationship", "Add a relationship between two devices (SQLite storage only). Common types: depends_on, connected_to, contains",
+			mcp.String("parent_id", "Parent device ID or name", mcp.Required()),
+			mcp.String("child_id", "Child device ID or name", mcp.Required()),
+			mcp.String("relationship_type", "Type of relationship (e.g., depends_on, connected_to, contains)", mcp.Required()),
+		),
+		s.handleAddRelationship,
+	)
+
+	// device_get_relationships - Get all relationships for a device
+	s.mcpServer.RegisterTool(
+		mcp.NewTool("device_get_relationships", "Get all relationships for a device (SQLite storage only)",
+			mcp.String("id", "Device ID or name", mcp.Required()),
+		),
+		s.handleGetRelationships,
+	)
+
+	// device_get_related - Get devices related to a device
+	s.mcpServer.RegisterTool(
+		mcp.NewTool("device_get_related", "Get devices related to a device (SQLite storage only)",
+			mcp.String("id", "Device ID or name", mcp.Required()),
+			mcp.String("relationship_type", "Filter by relationship type (optional, returns all types if not specified)"),
+		),
+		s.handleGetRelated,
+	)
+
+	// device_remove_relationship - Remove a relationship between two devices
+	s.mcpServer.RegisterTool(
+		mcp.NewTool("device_remove_relationship", "Remove a relationship between two devices (SQLite storage only)",
+			mcp.String("parent_id", "Parent device ID or name", mcp.Required()),
+			mcp.String("child_id", "Child device ID or name", mcp.Required()),
+			mcp.String("relationship_type", "Type of relationship to remove", mcp.Required()),
+		),
+		s.handleRemoveRelationship,
+	)
 }
 
 // HandleRequest handles MCP HTTP requests with optional bearer token authentication
@@ -371,4 +410,189 @@ func (s *Server) LogStartup() {
 	for _, tool := range tools {
 		log.Printf("  - %s: %s", tool.Name, tool.Description)
 	}
+}
+
+// Relationship tool handlers
+
+func (s *Server) handleAddRelationship(ctx context.Context, req *mcp.ToolRequest) (*mcp.ToolResponse, error) {
+	parentID, err := req.String("parent_id")
+	if err != nil {
+		return nil, mcp.NewToolErrorInvalidParams("parent_id is required")
+	}
+
+	childID, err := req.String("child_id")
+	if err != nil {
+		return nil, mcp.NewToolErrorInvalidParams("child_id is required")
+	}
+
+	relType, err := req.String("relationship_type")
+	if err != nil {
+		return nil, mcp.NewToolErrorInvalidParams("relationship_type is required")
+	}
+
+	// Resolve device names to IDs if needed
+	parentDevice, err := s.storage.GetDevice(parentID)
+	if err != nil {
+		return nil, mcp.NewToolErrorInternal("parent device not found: " + parentID)
+	}
+
+	childDevice, err := s.storage.GetDevice(childID)
+	if err != nil {
+		return nil, mcp.NewToolErrorInternal("child device not found: " + childID)
+	}
+
+	// Check if storage supports relationships
+	relStorage, ok := s.storage.(interface {
+		AddRelationship(parentID, childID, relationshipType string) error
+	})
+	if !ok {
+		return mcp.NewToolResponseText("Relationships are not supported by the current storage backend. Use SQLite storage to enable device relationships."), nil
+	}
+
+	if err := relStorage.AddRelationship(parentDevice.ID, childDevice.ID, relType); err != nil {
+		return nil, mcp.NewToolErrorInternal("failed to add relationship: " + err.Error())
+	}
+
+	return mcp.NewToolResponseText(fmt.Sprintf("Relationship added: %s -> %s (%s)", parentDevice.Name, childDevice.Name, relType)), nil
+}
+
+func (s *Server) handleGetRelationships(ctx context.Context, req *mcp.ToolRequest) (*mcp.ToolResponse, error) {
+	id, err := req.String("id")
+	if err != nil {
+		return nil, mcp.NewToolErrorInvalidParams("id is required")
+	}
+
+	// Get the device first to get its name
+	device, err := s.storage.GetDevice(id)
+	if err != nil {
+		return nil, mcp.NewToolErrorInternal("device not found: " + id)
+	}
+
+	// Check if storage supports relationships
+	relStorage, ok := s.storage.(interface {
+		GetRelationships(deviceID string) ([]storage.Relationship, error)
+	})
+	if !ok {
+		return mcp.NewToolResponseText("Relationships are not supported by the current storage backend. Use SQLite storage to enable device relationships."), nil
+	}
+
+	relationships, err := relStorage.GetRelationships(device.ID)
+	if err != nil {
+		return nil, mcp.NewToolErrorInternal("failed to get relationships: " + err.Error())
+	}
+
+	if len(relationships) == 0 {
+		return mcp.NewToolResponseText(fmt.Sprintf("No relationships found for device: %s", device.Name)), nil
+	}
+
+	var result strings.Builder
+	result.WriteString(fmt.Sprintf("Relationships for %s:\n\n", device.Name))
+	for _, rel := range relationships {
+		// Get device names
+		parent, _ := s.storage.GetDevice(rel.ParentID)
+		child, _ := s.storage.GetDevice(rel.ChildID)
+
+		parentName := rel.ParentID
+		childName := rel.ChildID
+		if parent != nil {
+			parentName = parent.Name
+		}
+		if child != nil {
+			childName = child.Name
+		}
+
+		result.WriteString(fmt.Sprintf("  %s -> %s (%s)\n", parentName, childName, rel.RelationshipType))
+	}
+
+	return mcp.NewToolResponseText(result.String()), nil
+}
+
+func (s *Server) handleGetRelated(ctx context.Context, req *mcp.ToolRequest) (*mcp.ToolResponse, error) {
+	id, err := req.String("id")
+	if err != nil {
+		return nil, mcp.NewToolErrorInvalidParams("id is required")
+	}
+
+	relType, _ := req.String("relationship_type")
+
+	// Get the device first to get its name
+	device, err := s.storage.GetDevice(id)
+	if err != nil {
+		return nil, mcp.NewToolErrorInternal("device not found: " + id)
+	}
+
+	// Check if storage supports relationships
+	relStorage, ok := s.storage.(interface {
+		GetRelatedDevices(deviceID, relationshipType string) ([]model.Device, error)
+	})
+	if !ok {
+		return mcp.NewToolResponseText("Relationships are not supported by the current storage backend. Use SQLite storage to enable device relationships."), nil
+	}
+
+	devices, err := relStorage.GetRelatedDevices(device.ID, relType)
+	if err != nil {
+		return nil, mcp.NewToolErrorInternal("failed to get related devices: " + err.Error())
+	}
+
+	if len(devices) == 0 {
+		if relType != "" {
+			return mcp.NewToolResponseText(fmt.Sprintf("No devices found related to %s with type '%s'", device.Name, relType)), nil
+		}
+		return mcp.NewToolResponseText(fmt.Sprintf("No devices found related to %s", device.Name)), nil
+	}
+
+	var result strings.Builder
+	if relType != "" {
+		result.WriteString(fmt.Sprintf("Devices related to %s (%s):\n\n", device.Name, relType))
+	} else {
+		result.WriteString(fmt.Sprintf("Devices related to %s:\n\n", device.Name))
+	}
+	for _, relatedDevice := range devices {
+		result.WriteString(s.formatDeviceSummary(&relatedDevice))
+		result.WriteString("\n")
+	}
+
+	return mcp.NewToolResponseText(result.String()), nil
+}
+
+func (s *Server) handleRemoveRelationship(ctx context.Context, req *mcp.ToolRequest) (*mcp.ToolResponse, error) {
+	parentID, err := req.String("parent_id")
+	if err != nil {
+		return nil, mcp.NewToolErrorInvalidParams("parent_id is required")
+	}
+
+	childID, err := req.String("child_id")
+	if err != nil {
+		return nil, mcp.NewToolErrorInvalidParams("child_id is required")
+	}
+
+	relType, err := req.String("relationship_type")
+	if err != nil {
+		return nil, mcp.NewToolErrorInvalidParams("relationship_type is required")
+	}
+
+	// Resolve device names to IDs if needed
+	parentDevice, err := s.storage.GetDevice(parentID)
+	if err != nil {
+		return nil, mcp.NewToolErrorInternal("parent device not found: " + parentID)
+	}
+
+	childDevice, err := s.storage.GetDevice(childID)
+	if err != nil {
+		return nil, mcp.NewToolErrorInternal("child device not found: " + childID)
+	}
+
+	// Check if storage supports relationships
+	relStorage, ok := s.storage.(interface {
+		RemoveRelationship(parentID, childID, relationshipType string) error
+	})
+	if !ok {
+		return mcp.NewToolResponseText("Relationships are not supported by the current storage backend. Use SQLite storage to enable device relationships."), nil
+	}
+
+	if err := relStorage.RemoveRelationship(parentDevice.ID, childDevice.ID, relType); err != nil {
+		return nil, mcp.NewToolErrorInternal("failed to remove relationship: " + err.Error())
+	}
+
+	return mcp.NewToolResponseText(fmt.Sprintf("Relationship removed: %s -> %s (%s)", parentDevice.Name, childDevice.Name, relType)), nil
 }

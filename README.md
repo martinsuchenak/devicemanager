@@ -5,24 +5,46 @@ A Go-based device tracking application with MCP server support, web UI, and CLI.
 ## Features
 
 - Track devices with detailed information (name, IP addresses, make/model, OS, location, tags, domains)
+- SQLite storage with support for device relationships
 - RESTful API for CRUD operations
-- Web UI for easy management
+- Modern web UI with dark mode support (follows OS theme)
 - CLI tool for command-line operations
 - MCP (Model Context Protocol) server for AI integration
-- File-based storage (JSON or TOML)
 - Deploy to Nomad, Docker, or run locally
 
 ## Quick Start
 
-### Local Development
+### Prerequisites
+
+- **Go 1.23+** for building the server and CLI
+- **bun** (for building web UI assets - only required for development)
+
+### Building
 
 ```bash
-# Run server directly
-go run cmd/server/main.go
+# Build everything (includes UI assets)
+make build
 
-# Or build and run
-go build -o devicemanager cmd/server/main.go
-./devicemanager
+# Or build separately
+make ui-build    # Build web UI assets
+make server      # Build server binary
+make cli         # Build CLI binary
+```
+
+The build process automatically:
+1. Installs UI dependencies with bun
+2. Builds Tailwind CSS and bundles JavaScript
+3. Embeds UI assets into the Go binary
+4. Compiles the server and CLI
+
+### Running
+
+```bash
+# Run server with default settings (SQLite storage)
+./build/devicemanager
+
+# Or use the Makefile target
+make run-server
 ```
 
 The server will start on `http://localhost:8080`:
@@ -53,19 +75,65 @@ Configure via environment variables:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `DM_DATA_DIR` | `./data` | Directory for device data files |
+| `DM_DATA_DIR` | `./data` | Directory for device data/database |
 | `DM_LISTEN_ADDR` | `:8080` | Server listen address |
-| `DM_STORAGE_FORMAT` | `json` | Storage format: `json` or `toml` |
+| `DM_STORAGE_BACKEND` | `sqlite` | Storage backend: `sqlite` or `file` |
+| `DM_STORAGE_FORMAT` | `json` | Storage format for file backend: `json` or `toml` |
 | `DM_BEARER_TOKEN` | (none) | MCP authentication token |
+
+### Storage Backends
+
+#### SQLite (Default)
+
+```bash
+DM_STORAGE_BACKEND=sqlite ./devicemanager
+```
+
+SQLite is the recommended backend and provides:
+- Better performance for large datasets
+- ACID transactions
+- Device relationship support
+- Single file database (`data/devices.db`)
+
+#### File-Based Storage
+
+```bash
+DM_STORAGE_BACKEND=file DM_STORAGE_FORMAT=json ./devicemanager
+```
+
+File-based storage stores each device as a separate file (JSON or TOML format).
+
+### Device Relationships (SQLite only)
+
+SQLite storage supports relationships between devices:
+
+```go
+// Add a relationship (e.g., device A depends on device B)
+storage.AddRelationship("device-a-id", "device-b-id", "depends_on")
+
+// Get related devices
+devices, _ := storage.GetRelatedDevices("device-a-id", "depends_on")
+
+// Get all relationships for a device
+relationships, _ := storage.GetRelationships("device-a-id")
+
+// Remove a relationship
+storage.RemoveRelationship("device-a-id", "device-b-id", "depends_on")
+```
+
+Supported relationship types:
+- `depends_on` - Device depends on another device
+- `connected_to` - Physical or logical connection
+- `contains` - Parent/child containment (e.g., chassis contains blade)
 
 ## CLI Usage
 
 ```bash
 # Build CLI
-go build -o dm-cli cmd/cli/main.go
+make cli
 
 # Add a device
-./dm-cli add \
+./build/dm-cli add \
   --name "web-server-01" \
   --make-model "Dell PowerEdge R740" \
   --os "Ubuntu 22.04" \
@@ -74,27 +142,27 @@ go build -o dm-cli cmd/cli/main.go
   --domains "example.com,www.example.com"
 
 # List all devices
-./dm-cli list
+./build/dm-cli list
 
 # Filter by tags
-./dm-cli list --filter server,production
+./build/dm-cli list --filter server,production
 
 # Get device details
-./dm-cli get web-server-01
+./build/dm-cli get web-server-01
 
 # Search devices
-./dm-cli search "dell"
+./build/dm-cli search "dell"
 
 # Update a device
-./dm-cli update web-server-01 \
+./build/dm-cli update web-server-01 \
   --location "Rack B2" \
   --tags "server,production,web,backend"
 
 # Delete a device
-./dm-cli delete web-server-01
+./build/dm-cli delete web-server-01
 
 # Use local storage instead of server
-./dm-cli --local add --name "local-device"
+./build/dm-cli --local add --name "local-device"
 ```
 
 ## REST API
@@ -155,18 +223,75 @@ DELETE /api/devices/{id}
 GET /api/search?q=dell
 ```
 
+### Relationships (SQLite only)
+
+#### Add Relationship
+```bash
+POST /api/devices/{id}/relationships
+Content-Type: application/json
+
+{
+  "child_id": "other-device-id",
+  "relationship_type": "depends_on"
+}
+```
+
+#### Get Relationships for a Device
+```bash
+GET /api/devices/{id}/relationships
+```
+
+Returns:
+```json
+[
+  {
+    "parent_id": "device-id",
+    "child_id": "other-device-id",
+    "relationship_type": "depends_on",
+    "created_at": "2024-01-02T12:00:00Z"
+  }
+]
+```
+
+#### Get Related Devices
+```bash
+GET /api/devices/{id}/related?type=depends_on
+```
+
+The `type` parameter is optional - if omitted, returns all related devices.
+
+#### Remove Relationship
+```bash
+DELETE /api/devices/{parent_id}/relationships/{child_id}/{relationship_type}
+```
+
 ## MCP Server
 
 The MCP server provides AI assistants with tools to manage devices:
 
-### Tools
+### Device Management Tools
 
-- `device_add` - Add a new device
-- `device_update` - Update an existing device
+- `device_save` - Create a new device or update an existing one (if ID provided)
 - `device_get` - Get device by ID or name
-- `device_list` - List devices with optional tag filtering
-- `device_search` - Search devices
+- `device_list` - List devices with optional search query or tag filtering
 - `device_delete` - Delete a device
+
+### Relationship Tools (SQLite only)
+
+- `device_add_relationship` - Add a relationship between two devices
+  - Parameters: `parent_id`, `child_id`, `relationship_type`
+  - Common types: `depends_on`, `connected_to`, `contains`
+
+- `device_get_relationships` - Get all relationships for a device
+  - Parameters: `id` (device ID or name)
+
+- `device_get_related` - Get devices related to a device
+  - Parameters: `id` (device ID or name), `relationship_type` (optional)
+
+- `device_remove_relationship` - Remove a relationship between two devices
+  - Parameters: `parent_id`, `child_id`, `relationship_type`
+
+> **Note:** Relationship tools will return a helpful message if the storage backend doesn't support relationships (use SQLite for relationship support).
 
 ### MCP Client Configuration
 
@@ -210,6 +335,28 @@ type Address struct {
 }
 ```
 
+## Web UI
+
+The web UI is built with:
+- **Alpine.js** v3.15.3 - Reactive JavaScript framework
+- **Tailwind CSS** v4.1.18 - Utility-first CSS framework
+- **Dark mode** - Automatically follows your OS theme preference
+
+### Building the UI (Development)
+
+```bash
+# Install dependencies
+cd webui && bun install
+
+# Watch for changes during development
+make ui-dev
+
+# Or manually
+cd webui && bun run watch
+```
+
+Built assets are embedded into the Go binary at compile time using `go:embed`.
+
 ## Development
 
 ### Project Structure
@@ -217,39 +364,58 @@ type Address struct {
 ```
 devicemanager/
 ├── cmd/
-│   ├── server/          # HTTP server
+│   ├── server/          # HTTP server + MCP endpoint
 │   └── cli/             # CLI tool
 ├── internal/
-│   ├── config/          # Configuration
-│   ├── storage/         # File storage
+│   ├── config/          # Configuration management
+│   ├── storage/         # Storage backends (SQLite + file)
 │   ├── model/           # Data models
-│   ├── api/             # REST handlers
-│   ├── mcp/             # MCP server
-│   └── ui/              # Web UI
+│   ├── api/             # REST API handlers
+│   ├── mcp/             # MCP server implementation
+│   └── ui/              # Web UI assets (embedded)
+├── webui/
+│   ├── src/             # UI source files
+│   ├── dist/            # Built assets (gitignored)
+│   └── package.json     # UI dependencies
 ├── deployment/
 │   └── nomad/           # Nomad jobs
-├── data/                # Device data files
+├── data/                # Device data/database (gitignored)
 └── go.mod
 ```
 
 ### Dependencies
 
+- `modernc.org/sqlite` - Pure Go SQLite driver
 - `github.com/pelletier/go-toml/v2` - TOML support
-- `github.com/paularlott/cli` - CLI framework
 - `github.com/paularlott/mcp` - MCP server
+- `alpinejs` - Web UI framework (dev dependency)
+- `tailwindcss` - UI styling (dev dependency)
 
-### Building
+### Makefile Targets
 
 ```bash
-# Build server
-go build -o devicemanager ./cmd/server
-
-# Build CLI
-go build -o dm-cli ./cmd/cli
-
-# Build for Linux (Docker)
-GOOS=linux GOARCH=amd64 go build -o devicemanager ./cmd/server
+make build          # Build everything (server + CLI + UI)
+make server         # Build server binary
+make cli            # Build CLI binary
+make ui-build       # Build UI assets
+make ui-dev         # Watch UI assets for development
+make ui-clean       # Remove UI build artifacts
+make clean          # Remove all build artifacts
+make test           # Run tests
+make docker-build   # Build Docker image
 ```
+
+### Migration from File Storage to SQLite
+
+If you have existing file-based storage, you can migrate to SQLite:
+
+```go
+// In your code or via a future CLI command
+sqliteStore, _ := storage.NewSQLiteStorage(dataDir)
+err := sqliteStore.MigrateFromFileStorage(dataDir, "json")
+```
+
+This will import all devices from JSON/TOML files into the SQLite database.
 
 ## License
 

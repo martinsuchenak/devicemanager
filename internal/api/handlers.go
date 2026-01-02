@@ -30,6 +30,12 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("PUT /api/devices/", h.updateDevice)
 	mux.HandleFunc("DELETE /api/devices/", h.deleteDevice)
 	mux.HandleFunc("GET /api/search", h.searchDevices)
+
+	// Relationship endpoints (SQLite only)
+	mux.HandleFunc("POST /api/devices/", h.addRelationship)
+	mux.HandleFunc("GET /api/devices/", h.getRelationships)
+	mux.HandleFunc("GET /api/devices/", h.getRelatedDevices)
+	mux.HandleFunc("DELETE /api/devices/", h.removeRelationship)
 }
 
 // listDevices handles GET /api/devices
@@ -211,4 +217,164 @@ func NewStaticFileHandler(contentType string, content io.ReadSeeker) http.Handle
 func (h *StaticFileHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", h.contentType)
 	http.ServeContent(w, r, "", time.Now(), h.content)
+}
+
+// Relationship handlers (SQLite only)
+
+// addRelationship handles POST /api/devices/{id}/relationships
+func (h *Handler) addRelationship(w http.ResponseWriter, r *http.Request) {
+	// Extract device ID from path: /api/devices/{id}/relationships
+	parts := strings.Split(strings.TrimPrefix(r.URL.Path, "/api/devices/"), "/")
+	if len(parts) < 2 || parts[1] != "relationships" {
+		h.writeError(w, http.StatusBadRequest, "invalid URL format")
+		return
+	}
+	deviceID := parts[0]
+
+	if deviceID == "" {
+		h.writeError(w, http.StatusBadRequest, "device ID required")
+		return
+	}
+
+	var req struct {
+		ChildID         string `json:"child_id"`
+		RelationshipType string `json:"relationship_type"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		h.writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	if req.ChildID == "" {
+		h.writeError(w, http.StatusBadRequest, "child_id is required")
+		return
+	}
+
+	if req.RelationshipType == "" {
+		req.RelationshipType = "related"
+	}
+
+	// Check if storage supports relationships
+	relStorage, ok := h.storage.(interface {
+		AddRelationship(parentID, childID, relationshipType string) error
+	})
+	if !ok {
+		h.writeError(w, http.StatusNotImplemented, "relationships are not supported by this storage backend")
+		return
+	}
+
+	if err := relStorage.AddRelationship(deviceID, req.ChildID, req.RelationshipType); err != nil {
+		if errors.Is(err, storage.ErrDeviceNotFound) {
+			h.writeError(w, http.StatusNotFound, "device not found")
+			return
+		}
+		h.writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(map[string]string{
+		"message":         "relationship created",
+		"parent_id":        deviceID,
+		"child_id":         req.ChildID,
+		"relationship_type": req.RelationshipType,
+	})
+}
+
+// getRelationships handles GET /api/devices/{id}/relationships
+func (h *Handler) getRelationships(w http.ResponseWriter, r *http.Request) {
+	// Extract device ID from path: /api/devices/{id}/relationships
+	parts := strings.Split(strings.TrimPrefix(r.URL.Path, "/api/devices/"), "/")
+	if len(parts) < 2 || parts[1] != "relationships" {
+		h.writeError(w, http.StatusBadRequest, "invalid URL format")
+		return
+	}
+	deviceID := parts[0]
+
+	// Check if storage supports relationships
+	relStorage, ok := h.storage.(interface {
+		GetRelationships(deviceID string) ([]storage.Relationship, error)
+	})
+	if !ok {
+		h.writeError(w, http.StatusNotImplemented, "relationships are not supported by this storage backend")
+		return
+	}
+
+	relationships, err := relStorage.GetRelationships(deviceID)
+	if err != nil {
+		h.writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	h.writeJSON(w, http.StatusOK, relationships)
+}
+
+// getRelatedDevices handles GET /api/devices/{id}/related
+func (h *Handler) getRelatedDevices(w http.ResponseWriter, r *http.Request) {
+	// Extract device ID from path: /api/devices/{id}/related
+	parts := strings.Split(strings.TrimPrefix(r.URL.Path, "/api/devices/"), "/")
+	if len(parts) < 2 || parts[1] != "related" {
+		h.writeError(w, http.StatusBadRequest, "invalid URL format")
+		return
+	}
+	deviceID := parts[0]
+
+	// Get relationship type from query parameter
+	relType := r.URL.Query().Get("type")
+
+	// Check if storage supports relationships
+	relStorage, ok := h.storage.(interface {
+		GetRelatedDevices(deviceID, relationshipType string) ([]model.Device, error)
+	})
+	if !ok {
+		h.writeError(w, http.StatusNotImplemented, "relationships are not supported by this storage backend")
+		return
+	}
+
+	devices, err := relStorage.GetRelatedDevices(deviceID, relType)
+	if err != nil {
+		h.writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	h.writeJSON(w, http.StatusOK, devices)
+}
+
+// removeRelationship handles DELETE /api/devices/{id}/relationships
+func (h *Handler) removeRelationship(w http.ResponseWriter, r *http.Request) {
+	// Extract device ID from path: /api/devices/{id}/relationships/{child_id}/{type}
+	parts := strings.Split(strings.TrimPrefix(r.URL.Path, "/api/devices/"), "/")
+	if len(parts) < 4 || parts[1] != "relationships" {
+		h.writeError(w, http.StatusBadRequest, "invalid URL format")
+		return
+	}
+	deviceID := parts[0]
+	childID := parts[2]
+	relType := parts[3]
+
+	if deviceID == "" || childID == "" {
+		h.writeError(w, http.StatusBadRequest, "device ID and child ID required")
+		return
+	}
+
+	// Check if storage supports relationships
+	relStorage, ok := h.storage.(interface {
+		RemoveRelationship(parentID, childID, relationshipType string) error
+	})
+	if !ok {
+		h.writeError(w, http.StatusNotImplemented, "relationships are not supported by this storage backend")
+		return
+	}
+
+	if err := relStorage.RemoveRelationship(deviceID, childID, relType); err != nil {
+		if errors.Is(err, storage.ErrDeviceNotFound) {
+			h.writeError(w, http.StatusNotFound, "device or relationship not found")
+			return
+		}
+		h.writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
 }
