@@ -1,5 +1,6 @@
 # Build outputs
-build/*
+build/
+internal/ui/assets/
 
 # Test binary, built with `go test -c`
 *.test
@@ -13,6 +14,10 @@ data/
 
 # Dependency directories
 vendor/
+
+# UI dependencies and build
+webui/node_modules/
+webui/dist/
 
 # Go workspace file
 go.work

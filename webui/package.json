@@ -1,0 +1,19 @@
+{
+  "name": "devicemanager-ui",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "build": "bun run build:css && bun run build:js",
+    "build:css": "tailwindcss -i ./src/input.css -o ./dist/output.css -m",
+    "build:js": "bun build ./src/app.js --outdir ./dist --minify --target browser",
+    "watch": "bun run build:css --watch & bun run build:js --watch",
+    "clean": "rm -rf ./dist"
+  },
+  "dependencies": {
+    "alpinejs": "^3.15.3"
+  },
+  "devDependencies": {
+    "@tailwindcss/cli": "^4.1.18",
+    "tailwindcss": "^4.1.18"
+  }
+}

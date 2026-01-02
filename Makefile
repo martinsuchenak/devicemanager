@@ -7,6 +7,7 @@ GO=go
 GOFLAGS=-v
 DOCKER=docker
 DOCKER_COMPOSE=docker-compose
+BUN=$(shell command -v bun || echo $(HOME)/.bun/bin/bun)
 
 # Build flags
 LDFLAGS=-ldflags="-s -w"
@@ -16,6 +17,8 @@ CGO_ENABLED=0
 CMD_DIR=./cmd
 BUILD_DIR=./build
 DOCKERFILE=./Dockerfile
+WEBUI_DIR=./webui
+ASSETS_DIR=./internal/ui/assets
 
 # Git version info
 VERSION?=$(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
@@ -25,13 +28,13 @@ GIT_COMMIT=$(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 # Nomad deployment
 NOMAD_JOB=deployment/nomad/devicemanager.nomad
 
-.PHONY: all build server cli clean test docker docker-build docker-push docker-compose-up docker-compose-down nomad-run nomad-stop help
+.PHONY: all build server cli ui ui-install ui-build ui-clean clean test docker docker-build docker-push docker-compose-up docker-compose-down nomad-run nomad-stop help
 
 # Default target
 all: build
 
-## build: Build both server and CLI binaries
-build: server cli
+## build: Build both server and CLI binaries (includes UI assets)
+build: ui-build server cli
 
 ## server: Build server binary
 server:
@@ -59,7 +62,7 @@ install:
 	$(GO) install $(GOFLAGS) $(CMD_DIR)/cli
 
 ## clean: Remove build artifacts
-clean:
+clean: ui-clean
 	@echo "Cleaning..."
 	$(GO) clean
 	rm -rf $(BUILD_DIR)
@@ -215,3 +218,37 @@ mock:
 	else \
 		echo "mockgen not installed. Install with: go install github.com/golang/mock/mockgen@latest"; \
 	fi
+
+# UI build targets
+## ui: Build UI assets
+ui: ui-build
+
+## ui-install: Install UI dependencies
+ui-install:
+	@echo "Installing UI dependencies..."
+	@export PATH="$(HOME)/.bun/bin:$$PATH" && cd $(WEBUI_DIR) && bun install
+
+## ui-build: Build UI assets
+ui-build:
+	@echo "Building UI assets..."
+	@if [ ! -d "$(WEBUI_DIR)/node_modules" ]; then \
+		echo "Installing dependencies first..."; \
+		export PATH="$(HOME)/.bun/bin:$$PATH" && cd $(WEBUI_DIR) && bun install; \
+	fi
+	@export PATH="$(HOME)/.bun/bin:$$PATH" && cd $(WEBUI_DIR) && bun run build
+	@mkdir -p $(ASSETS_DIR)
+	@cp $(WEBUI_DIR)/src/index.html $(ASSETS_DIR)/index.html
+	@cp $(WEBUI_DIR)/dist/output.css $(ASSETS_DIR)/output.css
+	@cp $(WEBUI_DIR)/dist/app.js $(ASSETS_DIR)/app.js
+	@echo "UI assets built successfully"
+
+## ui-clean: Remove UI build artifacts
+ui-clean:
+	@echo "Cleaning UI assets..."
+	@cd $(WEBUI_DIR) && bun run clean 2>/dev/null || true
+	@rm -rf $(ASSETS_DIR)
+
+## ui-dev: Watch UI assets for development
+ui-dev:
+	@echo "Watching UI assets..."
+	@export PATH="$(HOME)/.bun/bin:$$PATH" && cd $(WEBUI_DIR) && bun run watch
