@@ -4,10 +4,11 @@ A Go-based device tracking application with MCP server support, web UI, and CLI.
 
 ## Features
 
-- Track devices with detailed information (name, IP addresses, make/model, OS, datacenter, tags, domains)
+- Track devices with detailed information (name, IP addresses, make/model, OS, datacenter, tags, domains, username)
 - Manage datacenters with location and description metadata
+- Manage networks with subnet/CIDR notation and device IP assignments
 - SQLite storage with support for device relationships
-- RESTful API for CRUD operations on devices and datacenters
+- RESTful API for CRUD operations on devices, datacenters, and networks
 - Modern web UI with dark mode support (follows OS theme)
 - CLI tool for command-line operations
 - MCP (Model Context Protocol) server for AI integration
@@ -227,6 +228,7 @@ Content-Type: application/json
   "make_model": "Dell PowerEdge R740",
   "os": "Ubuntu 22.04",
   "datacenter_id": "dc-123",
+  "username": "admin",
   "tags": ["server", "production", "web"],
   "domains": ["example.com"],
   "addresses": [
@@ -234,7 +236,9 @@ Content-Type: application/json
       "ip": "192.168.1.10",
       "port": 443,
       "type": "ipv4",
-      "label": "management"
+      "label": "management",
+      "network_id": "net-123",
+      "switch_port": "Gi1/0/1"
     }
   ]
 }
@@ -309,6 +313,57 @@ Note: Deleting a datacenter will remove the datacenter reference from all device
 GET /api/datacenters/{id}/devices
 ```
 
+### Networks (SQLite only)
+
+#### List Networks
+```bash
+GET /api/networks
+GET /api/networks?name=production
+GET /api/networks?datacenter_id=dc-123
+```
+
+#### Get Network
+```bash
+GET /api/networks/{id}
+```
+
+#### Create Network
+```bash
+POST /api/networks
+Content-Type: application/json
+
+{
+  "name": "Production Network",
+  "subnet": "192.168.1.0/24",
+  "datacenter_id": "dc-123",
+  "description": "Primary production network"
+}
+```
+
+#### Update Network
+```bash
+PUT /api/networks/{id}
+Content-Type: application/json
+
+{
+  "name": "Updated Network Name",
+  "subnet": "10.0.1.0/24",
+  "description": "Updated description"
+}
+```
+
+#### Delete Network
+```bash
+DELETE /api/networks/{id}
+```
+
+#### Get Network Devices
+```bash
+GET /api/networks/{id}/devices
+```
+
+Returns all devices that have addresses belonging to this network.
+
 ### Relationships (SQLite only)
 
 #### Add Relationship
@@ -358,8 +413,12 @@ The MCP server provides AI assistants with tools to manage devices:
 ### Device Management Tools
 
 - `device_save` - Create a new device or update an existing one (if ID provided)
+  - Parameters: `id` (optional, for updates), `name` (required), `description`, `make_model`, `os`, `datacenter_id`, `username`, `tags`, `domains`, `addresses`
+  - Addresses: Array of objects with `ip` (required), `port`, `type`, `label`, `network_id`, `switch_port`
+
 - `device_get` - Get device by ID or name
 - `device_list` - List devices with optional search query or tag filtering
+  - Parameters: `query` (searches name, IP, tags, domains, datacenter), `tags` (filter by tags)
 - `device_delete` - Delete a device
 
 ### Relationship Tools (SQLite only)
@@ -377,7 +436,41 @@ The MCP server provides AI assistants with tools to manage devices:
 - `device_remove_relationship` - Remove a relationship between two devices
   - Parameters: `parent_id`, `child_id`, `relationship_type`
 
-> **Note:** Relationship tools will return a helpful message if the storage backend doesn't support relationships (use SQLite for relationship support).
+### Datacenter Tools (SQLite only)
+
+- `datacenter_list` - List all datacenters, optionally filtered by name
+  - Parameters: `name` (optional filter)
+
+- `datacenter_get` - Get a datacenter by ID or name
+  - Parameters: `id` (datacenter ID or name)
+
+- `datacenter_save` - Create a new datacenter or update an existing one
+  - Parameters: `id` (optional, for updates), `name` (required), `location`, `description`
+
+- `datacenter_delete` - Delete a datacenter from the inventory
+  - Parameters: `id` (datacenter ID or name)
+
+- `datacenter_get_devices` - Get all devices located in a specific datacenter
+  - Parameters: `id` (datacenter ID or name)
+
+### Network Tools (SQLite only)
+
+- `network_list` - List all networks, optionally filtered by name or datacenter
+  - Parameters: `name` (optional filter), `datacenter_id` (optional filter)
+
+- `network_get` - Get a network by ID or name
+  - Parameters: `id` (network ID or name)
+
+- `network_save` - Create a new network or update an existing one
+  - Parameters: `id` (optional, for updates), `name` (required), `subnet` (required, CIDR notation), `datacenter_id` (required), `description`
+
+- `network_delete` - Delete a network from the inventory
+  - Parameters: `id` (network ID or name)
+
+- `network_get_devices` - Get all devices with addresses on a specific network
+  - Parameters: `id` (network ID or name)
+
+> **Note:** Datacenter and Network tools will return a helpful message if the storage backend doesn't support these features (use SQLite for full support).
 
 ### MCP Client Configuration
 
@@ -400,17 +493,18 @@ Configure your MCP client (e.g., Claude Desktop) to connect:
 
 ```go
 type Device struct {
-    ID          string       `json:"id"`
-    Name        string       `json:"name"`
-    Description string       `json:"description"`
-    MakeModel   string       `json:"make_model"`
-    OS          string       `json:"os"`
-    DatacenterID string      `json:"datacenter_id"`
-    Tags        []string     `json:"tags"`
-    Addresses   []Address    `json:"addresses"`
-    Domains     []string     `json:"domains"`
-    CreatedAt   time.Time    `json:"created_at"`
-    UpdatedAt   time.Time    `json:"updated_at"`
+    ID           string       `json:"id"`
+    Name         string       `json:"name"`
+    Description  string       `json:"description"`
+    MakeModel    string       `json:"make_model"`
+    OS           string       `json:"os"`
+    DatacenterID string       `json:"datacenter_id"`
+    Username     string       `json:"username"`
+    Tags         []string     `json:"tags"`
+    Addresses    []Address    `json:"addresses"`
+    Domains      []string     `json:"domains"`
+    CreatedAt    time.Time    `json:"created_at"`
+    UpdatedAt    time.Time    `json:"updated_at"`
 }
 
 type Datacenter struct {
@@ -422,11 +516,23 @@ type Datacenter struct {
     UpdatedAt   time.Time `json:"updated_at"`
 }
 
+type Network struct {
+    ID           string    `json:"id"`
+    Name         string    `json:"name"`
+    Subnet       string    `json:"subnet"`       // CIDR notation (e.g., "192.168.1.0/24")
+    DatacenterID string    `json:"datacenter_id"`
+    Description  string    `json:"description"`
+    CreatedAt    time.Time `json:"created_at"`
+    UpdatedAt    time.Time `json:"updated_at"`
+}
+
 type Address struct {
-    IP    string `json:"ip"`
-    Port  int    `json:"port"`
-    Type  string `json:"type"`   // "ipv4" or "ipv6"
-    Label string `json:"label"`  // e.g., "management", "data"
+    IP         string `json:"ip"`
+    Port       int    `json:"port"`
+    Type       string `json:"type"`         // "ipv4" or "ipv6"
+    Label      string `json:"label"`        // e.g., "management", "data"
+    NetworkID  string `json:"network_id"`   // Network this IP belongs to
+    SwitchPort string `json:"switch_port"`  // Switch port (e.g., "eth0", "Gi1/0/1")
 }
 ```
 
