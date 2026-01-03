@@ -3,14 +3,15 @@ info:
   title: Rackd API
   description: |
     RESTful API for managing device inventory. Track devices with detailed information
-    including network addresses, domains, tags, and physical locations.
+    including network addresses, domains, tags, datacenters, and networks.
 
     **Features:**
-    - CRUD operations for devices
+    - CRUD operations for devices, datacenters, and networks
     - Search functionality across all device properties
     - Tag-based filtering
     - Support for multiple network addresses per device
     - Device relationships (SQLite storage backend)
+    - Network and datacenter management
 
     **Authentication:**
     The API does not require authentication by default. Bearer token authentication
@@ -34,6 +35,10 @@ servers:
 tags:
   - name: devices
     description: Device management operations
+  - name: datacenters
+    description: Datacenter management operations
+  - name: networks
+    description: Network management operations
   - name: search
     description: Search operations
   - name: relationships
@@ -70,12 +75,13 @@ paths:
                 single:
                   summary: Single device
                   value:
-                    - id: web-server-01-20250102120000
+                    - id: "01915fdc-8d4f-7126-83d6-9c5b00f00e55"
                       name: web-server-01
                       description: Main web server
                       make_model: Dell PowerEdge R740
                       os: Ubuntu 22.04
-                      location: Rack A1
+                      datacenter_id: "01915fdc-8d4f-7126-83d6-9c5b00f00e01"
+                      username: admin
                       tags: [server, production, web]
                       domains: [example.com]
                       addresses:
@@ -83,6 +89,8 @@ paths:
                           port: 443
                           type: ipv4
                           label: management
+                          network_id: "01915fdc-8d4f-7126-83d6-9c5b00f00e02"
+                          switch_port: eth0
                       created_at: '2025-01-02T12:00:00Z'
                       updated_at: '2025-01-02T12:00:00Z'
         '500':
@@ -112,7 +120,8 @@ paths:
                   description: Edge firewall
                   make_model: Fortinet FortiGate 60F
                   os: FortiOS 7.2
-                  location: Rack A1
+                  datacenter_id: "01915fdc-8d4f-7126-83d6-9c5b00f00e01"
+                  username: admin
                   tags: [network, security, edge]
                   domains: [example.com]
                   addresses:
@@ -120,10 +129,14 @@ paths:
                       port: 443
                       type: ipv4
                       label: management
+                      network_id: "01915fdc-8d4f-7126-83d6-9c5b00f00e02"
+                      switch_port: eth0
                     - ip: 192.168.1.2
                       port: 22
                       type: ipv4
                       label: ssh
+                      network_id: "01915fdc-8d4f-7126-83d6-9c5b00f00e02"
+                      switch_port: eth1
       responses:
         '201':
           description: Device created successfully
@@ -152,7 +165,7 @@ paths:
         required: true
         schema:
           type: string
-        example: web-server-01-20250102120000
+        example: "01915fdc-8d4f-7126-83d6-9c5b00f00e55"
 
     get:
       summary: Get a device
@@ -189,7 +202,7 @@ paths:
                 summary: Partial update
                 value:
                   name: web-server-01
-                  location: Rack B2
+                  datacenter_id: "01915fdc-8d4f-7126-83d6-9c5b00f00e01"
       responses:
         '200':
           description: Device updated successfully
@@ -218,11 +231,522 @@ paths:
         '500':
           $ref: '#/components/responses/Error'
 
+  /datacenters:
+    get:
+      summary: List all datacenters
+      description: Retrieve a list of all datacenters, optionally filtered by name
+      operationId: listDatacenters
+      tags:
+        - datacenters
+      parameters:
+        - name: name
+          in: query
+          description: Filter datacenters by name
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Datacenter'
+              example:
+                - id: "01915fdc-8d4f-7126-83d6-9c5b00f00e01"
+                  name: NYC1
+                  location: New York, USA
+                  description: Primary US East datacenter
+                  created_at: '2025-01-02T12:00:00Z'
+                  updated_at: '2025-01-02T12:00:00Z'
+        '501':
+          description: Datacenters not supported by storage backend
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: datacenters are not supported by this storage backend
+        '500':
+          $ref: '#/components/responses/Error'
+
+    post:
+      summary: Create a new datacenter
+      description: Add a new datacenter to the inventory
+      operationId: createDatacenter
+      tags:
+        - datacenters
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DatacenterInput'
+            examples:
+              minimal:
+                summary: Minimal datacenter
+                value:
+                  name: NYC2
+              full:
+                summary: Complete datacenter with all fields
+                value:
+                  name: SFO1
+                  location: San Francisco, USA
+                  description: West Coast datacenter
+      responses:
+        '201':
+          description: Datacenter created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Datacenter'
+        '400':
+          $ref: '#/components/responses/Error'
+        '409':
+          description: Datacenter with this name already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: datacenter with this name already exists
+        '501':
+          description: Datacenters not supported by storage backend
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: datacenters are not supported by this storage backend
+        '500':
+          $ref: '#/components/responses/Error'
+
+  /datacenters/{id}:
+    parameters:
+      - name: id
+        in: path
+        description: Datacenter ID or name
+        required: true
+        schema:
+          type: string
+        example: "01915fdc-8d4f-7126-83d6-9c5b00f00e01"
+
+    get:
+      summary: Get a datacenter
+      description: Retrieve a specific datacenter by ID or name
+      operationId: getDatacenter
+      tags:
+        - datacenters
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Datacenter'
+        '404':
+          description: Datacenter not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: datacenter not found
+        '501':
+          description: Datacenters not supported by storage backend
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: datacenters are not supported by this storage backend
+        '500':
+          $ref: '#/components/responses/Error'
+
+    put:
+      summary: Update a datacenter
+      description: Update an existing datacenter's information
+      operationId: updateDatacenter
+      tags:
+        - datacenters
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DatacenterInput'
+            examples:
+              partial:
+                summary: Partial update
+                value:
+                  name: NYC1
+                  location: New York, USA
+      responses:
+        '200':
+          description: Datacenter updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Datacenter'
+        '400':
+          $ref: '#/components/responses/Error'
+        '404':
+          description: Datacenter not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: datacenter not found
+        '501':
+          description: Datacenters not supported by storage backend
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: datacenters are not supported by this storage backend
+        '500':
+          $ref: '#/components/responses/Error'
+
+    delete:
+      summary: Delete a datacenter
+      description: Remove a datacenter from the inventory
+      operationId: deleteDatacenter
+      tags:
+        - datacenters
+      responses:
+        '204':
+          description: Datacenter deleted successfully
+        '404':
+          description: Datacenter not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: datacenter not found
+        '501':
+          description: Datacenters not supported by storage backend
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: datacenters are not supported by this storage backend
+        '500':
+          $ref: '#/components/responses/Error'
+
+  /datacenters/{id}/devices:
+    parameters:
+      - name: id
+        in: path
+        description: Datacenter ID or name
+        required: true
+        schema:
+          type: string
+        example: "01915fdc-8d4f-7126-83d6-9c5b00f00e01"
+
+    get:
+      summary: Get devices in a datacenter
+      description: Retrieve all devices located in a specific datacenter
+      operationId: getDatacenterDevices
+      tags:
+        - datacenters
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Device'
+        '404':
+          description: Datacenter not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: datacenter not found
+        '501':
+          description: Datacenters not supported by storage backend
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: datacenters are not supported by this storage backend
+        '500':
+          $ref: '#/components/responses/Error'
+
+  /networks:
+    get:
+      summary: List all networks
+      description: Retrieve a list of all networks, optionally filtered by name or datacenter
+      operationId: listNetworks
+      tags:
+        - networks
+      parameters:
+        - name: name
+          in: query
+          description: Filter networks by name
+          schema:
+            type: string
+        - name: datacenter_id
+          in: query
+          description: Filter networks by datacenter ID
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Network'
+              example:
+                - id: "01915fdc-8d4f-7126-83d6-9c5b00f00e02"
+                  name: production-network
+                  subnet: 192.168.1.0/24
+                  datacenter_id: "01915fdc-8d4f-7126-83d6-9c5b00f00e01"
+                  description: Production network in NYC1
+                  created_at: '2025-01-02T12:00:00Z'
+                  updated_at: '2025-01-02T12:00:00Z'
+        '501':
+          description: Networks not supported by storage backend
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: networks are not supported by this storage backend
+        '500':
+          $ref: '#/components/responses/Error'
+
+    post:
+      summary: Create a new network
+      description: Add a new network to the inventory
+      operationId: createNetwork
+      tags:
+        - networks
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NetworkInput'
+            examples:
+              minimal:
+                summary: Minimal network
+                value:
+                  name: staging-network
+                  subnet: 10.0.1.0/24
+                  datacenter_id: "01915fdc-8d4f-7126-83d6-9c5b00f00e01"
+              full:
+                summary: Complete network with all fields
+                value:
+                  name: dmz-network
+                  subnet: 10.0.2.0/24
+                  datacenter_id: "01915fdc-8d4f-7126-83d6-9c5b00f00e01"
+                  description: DMZ network for public-facing services
+      responses:
+        '201':
+          description: Network created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Network'
+        '400':
+          $ref: '#/components/responses/Error'
+        '409':
+          description: Network with this name already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: network with this name already exists
+        '501':
+          description: Networks not supported by storage backend
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: networks are not supported by this storage backend
+        '500':
+          $ref: '#/components/responses/Error'
+
+  /networks/{id}:
+    parameters:
+      - name: id
+        in: path
+        description: Network ID or name
+        required: true
+        schema:
+          type: string
+        example: "01915fdc-8d4f-7126-83d6-9c5b00f00e02"
+
+    get:
+      summary: Get a network
+      description: Retrieve a specific network by ID or name
+      operationId: getNetwork
+      tags:
+        - networks
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Network'
+        '404':
+          description: Network not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: network not found
+        '501':
+          description: Networks not supported by storage backend
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: networks are not supported by this storage backend
+        '500':
+          $ref: '#/components/responses/Error'
+
+    put:
+      summary: Update a network
+      description: Update an existing network's information
+      operationId: updateNetwork
+      tags:
+        - networks
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NetworkInput'
+            examples:
+              partial:
+                summary: Partial update
+                value:
+                  name: production-network
+                  subnet: 192.168.1.0/24
+      responses:
+        '200':
+          description: Network updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Network'
+        '400':
+          $ref: '#/components/responses/Error'
+        '404':
+          description: Network not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: network not found
+        '501':
+          description: Networks not supported by storage backend
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: networks are not supported by this storage backend
+        '500':
+          $ref: '#/components/responses/Error'
+
+    delete:
+      summary: Delete a network
+      description: Remove a network from the inventory
+      operationId: deleteNetwork
+      tags:
+        - networks
+      responses:
+        '204':
+          description: Network deleted successfully
+        '404':
+          description: Network not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: network not found
+        '501':
+          description: Networks not supported by storage backend
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: networks are not supported by this storage backend
+        '500':
+          $ref: '#/components/responses/Error'
+
+  /networks/{id}/devices:
+    parameters:
+      - name: id
+        in: path
+        description: Network ID or name
+        required: true
+        schema:
+          type: string
+        example: "01915fdc-8d4f-7126-83d6-9c5b00f00e02"
+
+    get:
+      summary: Get devices on a network
+      description: Retrieve all devices with addresses on a specific network
+      operationId: getNetworkDevices
+      tags:
+        - networks
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Device'
+        '404':
+          description: Network not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: network not found
+        '501':
+          description: Networks not supported by storage backend
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: networks are not supported by this storage backend
+        '500':
+          $ref: '#/components/responses/Error'
+
   /search:
     get:
       summary: Search devices
       description: |
-        Search for devices by name, IP address, tags, domains, location,
+        Search for devices by name, IP address, tags, domains, datacenter,
         make/model, OS, or description. The search is case-insensitive
         and matches partial strings.
       operationId: searchDevices
@@ -267,7 +791,7 @@ paths:
         required: true
         schema:
           type: string
-        example: web-server-01-20250102120000
+        example: "01915fdc-8d4f-7126-83d6-9c5b00f00e55"
 
     get:
       summary: Get device relationships
@@ -287,12 +811,12 @@ paths:
                 items:
                   $ref: '#/components/schemas/Relationship'
               example:
-                - parent_id: switch-core-01-20250102120000
-                  child_id: web-server-01-20250102120000
+                - parent_id: "01915fdc-8d4f-7126-83d6-9c5b00f00e03"
+                  child_id: "01915fdc-8d4f-7126-83d6-9c5b00f00e55"
                   relationship_type: connected_to
                   created_at: '2025-01-02T12:00:00Z'
-                - parent_id: web-server-01-20250102120000
-                  child_id: database-01-20250102120000
+                - parent_id: "01915fdc-8d4f-7126-83d6-9c5b00f00e55"
+                  child_id: "01915fdc-8d4f-7126-83d6-9c5b00f00e04"
                   relationship_type: depends_on
                   created_at: '2025-01-02T12:05:00Z'
         '404':
@@ -327,12 +851,12 @@ paths:
               depends_on:
                 summary: Dependency relationship
                 value:
-                  child_id: database-01-20250102120000
+                  child_id: "01915fdc-8d4f-7126-83d6-9c5b00f00e04"
                   relationship_type: depends_on
               connected_to:
                 summary: Network connection
                 value:
-                  child_id: switch-core-01-20250102120000
+                  child_id: "01915fdc-8d4f-7126-83d6-9c5b00f00e03"
                   relationship_type: connected_to
       responses:
         '201':
@@ -352,8 +876,8 @@ paths:
                     type: string
                 example:
                   message: relationship created
-                  parent_id: web-server-01-20250102120000
-                  child_id: database-01-20250102120000
+                  parent_id: "01915fdc-8d4f-7126-83d6-9c5b00f00e55"
+                  child_id: "01915fdc-8d4f-7126-83d6-9c5b00f00e04"
                   relationship_type: depends_on
         '400':
           $ref: '#/components/responses/BadRequest'
@@ -378,7 +902,7 @@ paths:
         required: true
         schema:
           type: string
-        example: web-server-01-20250102120000
+        example: "01915fdc-8d4f-7126-83d6-9c5b00f00e55"
 
     get:
       summary: Get related devices
@@ -426,21 +950,21 @@ paths:
         required: true
         schema:
           type: string
-        example: web-server-01-20250102120000
+        example: "01915fdc-8d4f-7126-83d6-9c5b00f00e55"
       - name: childId
         in: path
         description: Child device ID or unique name
         required: true
         schema:
           type: string
-        example: database-01-20250102120000
+        example: "01915fdc-8d4f-7126-83d6-9c5b00f00e04"
       - name: relationshipType
         in: path
         description: Type of relationship to remove
         required: true
         schema:
           type: string
-          example: depends_on
+        example: depends_on
 
     delete:
       summary: Remove a relationship
@@ -485,10 +1009,10 @@ components:
       properties:
         id:
           type: string
-          description: Unique device identifier (auto-generated)
+          description: Unique device identifier (auto-generated UUIDv7)
           format: uuid
           readOnly: true
-          example: web-server-01-20250102120000
+          example: "01915fdc-8d4f-7126-83d6-9c5b00f00e55"
         name:
           type: string
           description: Device name
@@ -506,10 +1030,15 @@ components:
           type: string
           description: Operating system
           example: Ubuntu 22.04 LTS
-        location:
+        datacenter_id:
           type: string
-          description: Physical location
-          example: Rack A1, Row 3
+          description: ID of the datacenter where this device is located
+          format: uuid
+          example: "01915fdc-8d4f-7126-83d6-9c5b00f00e01"
+        username:
+          type: string
+          description: Username for SSH/login access
+          example: admin
         tags:
           type: array
           description: Tags for categorization and filtering
@@ -556,9 +1085,13 @@ components:
         os:
           type: string
           description: Operating system
-        location:
+        datacenter_id:
           type: string
-          description: Physical location
+          description: ID of the datacenter where this device is located
+          format: uuid
+        username:
+          type: string
+          description: Username for SSH/login access
         tags:
           type: array
           description: Tags for categorization and filtering
@@ -602,6 +1135,138 @@ components:
           type: string
           description: Optional label for the address (e.g., "management", "data")
           example: management
+        network_id:
+          type: string
+          description: ID of the network this address belongs to
+          format: uuid
+          example: "01915fdc-8d4f-7126-83d6-9c5b00f00e02"
+        switch_port:
+          type: string
+          description: Switch port identifier (e.g., "eth0", "Gi1/0/1")
+          example: eth0
+
+    Datacenter:
+      type: object
+      description: A datacenter location
+      required:
+        - id
+        - name
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: string
+          description: Unique datacenter identifier (auto-generated UUIDv7)
+          format: uuid
+          readOnly: true
+          example: "01915fdc-8d4f-7126-83d6-9c5b00f00e01"
+        name:
+          type: string
+          description: Datacenter name (must be unique)
+          minLength: 1
+          example: NYC1
+        location:
+          type: string
+          description: Physical location or address
+          example: New York, USA
+        description:
+          type: string
+          description: Optional description of the datacenter
+          example: Primary US East datacenter
+        created_at:
+          type: string
+          format: date-time
+          description: Creation timestamp
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          description: Last update timestamp
+          readOnly: true
+
+    DatacenterInput:
+      type: object
+      description: Input for creating or updating a datacenter
+      properties:
+        name:
+          type: string
+          description: Datacenter name
+          minLength: 1
+        location:
+          type: string
+          description: Physical location or address
+        description:
+          type: string
+          description: Optional description of the datacenter
+
+    Network:
+      type: object
+      description: A network subnet
+      required:
+        - id
+        - name
+        - subnet
+        - datacenter_id
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: string
+          description: Unique network identifier (auto-generated UUIDv7)
+          format: uuid
+          readOnly: true
+          example: "01915fdc-8d4f-7126-83d6-9c5b00f00e02"
+        name:
+          type: string
+          description: Network name (must be unique)
+          minLength: 1
+          example: production-network
+        subnet:
+          type: string
+          description: IP subnet in CIDR notation
+          example: 192.168.1.0/24
+        datacenter_id:
+          type: string
+          description: ID of the datacenter where this network is located
+          format: uuid
+          example: "01915fdc-8d4f-7126-83d6-9c5b00f00e01"
+        description:
+          type: string
+          description: Optional description of the network
+          example: Production network in NYC1
+        created_at:
+          type: string
+          format: date-time
+          description: Creation timestamp
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          description: Last update timestamp
+          readOnly: true
+
+    NetworkInput:
+      type: object
+      description: Input for creating or updating a network
+      required:
+        - name
+        - subnet
+        - datacenter_id
+      properties:
+        name:
+          type: string
+          description: Network name
+          minLength: 1
+        subnet:
+          type: string
+          description: IP subnet in CIDR notation
+        datacenter_id:
+          type: string
+          description: ID of the datacenter where this network is located
+          format: uuid
+        description:
+          type: string
+          description: Optional description of the network
 
     Relationship:
       type: object
@@ -615,11 +1280,11 @@ components:
         parent_id:
           type: string
           description: Parent device ID
-          example: web-server-01-20250102120000
+          example: "01915fdc-8d4f-7126-83d6-9c5b00f00e03"
         child_id:
           type: string
           description: Child device ID
-          example: database-01-20250102120000
+          example: "01915fdc-8d4f-7126-83d6-9c5b00f00e04"
         relationship_type:
           type: string
           description: Type of relationship
@@ -640,7 +1305,7 @@ components:
         child_id:
           type: string
           description: Child device ID or name
-          example: database-01-20250102120000
+          example: "01915fdc-8d4f-7126-83d6-9c5b00f00e04"
         relationship_type:
           type: string
           description: Type of relationship
