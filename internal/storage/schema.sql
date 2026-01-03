@@ -13,6 +13,23 @@ CREATE TABLE IF NOT EXISTS datacenters (
 -- Create index on datacenter name for fast lookups
 CREATE INDEX IF NOT EXISTS idx_datacenters_name ON datacenters(name);
 
+-- Networks table
+CREATE TABLE IF NOT EXISTS networks (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL UNIQUE,
+    subnet TEXT NOT NULL,
+    datacenter_id TEXT NOT NULL,
+    description TEXT,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (datacenter_id) REFERENCES datacenters(id) ON DELETE CASCADE
+);
+
+-- Create index on network name for fast lookups
+CREATE INDEX IF NOT EXISTS idx_networks_name ON networks(name);
+-- Create index on datacenter_id for networks
+CREATE INDEX IF NOT EXISTS idx_networks_datacenter_id ON networks(datacenter_id);
+
 -- Devices table (main entity)
 CREATE TABLE IF NOT EXISTS devices (
     id TEXT PRIMARY KEY,
@@ -21,6 +38,7 @@ CREATE TABLE IF NOT EXISTS devices (
     make_model TEXT,
     os TEXT,
     datacenter_id TEXT,
+    username TEXT,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (datacenter_id) REFERENCES datacenters(id) ON DELETE SET NULL
@@ -37,11 +55,16 @@ CREATE TABLE IF NOT EXISTS addresses (
     port INTEGER,
     type TEXT CHECK(type IN ('ipv4', 'ipv6')) DEFAULT 'ipv4',
     label TEXT,
-    FOREIGN KEY (device_id) REFERENCES devices(id) ON DELETE CASCADE
+    network_id TEXT,
+    switch_port TEXT,
+    FOREIGN KEY (device_id) REFERENCES devices(id) ON DELETE CASCADE,
+    FOREIGN KEY (network_id) REFERENCES networks(id) ON DELETE SET NULL
 );
 
 -- Create index on device_id for addresses
 CREATE INDEX IF NOT EXISTS idx_addresses_device_id ON addresses(device_id);
+-- Create index on network_id for addresses
+CREATE INDEX IF NOT EXISTS idx_addresses_network_id ON addresses(network_id);
 
 -- Tags table (one-to-many with devices)
 CREATE TABLE IF NOT EXISTS tags (
@@ -84,7 +107,7 @@ CREATE INDEX IF NOT EXISTS idx_relationships_parent ON device_relationships(pare
 CREATE INDEX IF NOT EXISTS idx_relationships_child ON device_relationships(child_id);
 CREATE INDEX IF NOT EXISTS idx_relationships_type ON device_relationships(relationship_type);
 
--- Trigger to update updated_at timestamp
+-- Trigger to update updated_at timestamp for devices
 CREATE TRIGGER IF NOT EXISTS update_devices_timestamp
 AFTER UPDATE ON devices
 FOR EACH ROW
@@ -100,6 +123,14 @@ BEGIN
     UPDATE datacenters SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
 END;
 
+-- Trigger to update updated_at timestamp for networks
+CREATE TRIGGER IF NOT EXISTS update_networks_timestamp
+AFTER UPDATE ON networks
+FOR EACH ROW
+BEGIN
+    UPDATE networks SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
+END;
+
 -- Schema migrations tracking
 CREATE TABLE IF NOT EXISTS schema_migrations (
     version INTEGER PRIMARY KEY,
@@ -107,4 +138,5 @@ CREATE TABLE IF NOT EXISTS schema_migrations (
 );
 
 -- Insert initial schema version
+-- Note: This represents version 2, migrations will upgrade to v3, v4, and v5
 INSERT OR IGNORE INTO schema_migrations (version) VALUES (2);

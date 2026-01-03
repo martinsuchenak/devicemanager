@@ -16,7 +16,10 @@
       "WebSearch",
       "Bash(DM_STORAGE_BACKEND=sqlite timeout:*)",
       "Bash(./build/devicemanager:*)",
-      "Bash(# Find all files with DM_ references \\(config env variables\\) grep -rn \"\"DM_\"\" --include=\"\"*.go\"\" . --include=\"\"*.env*\"\" .)"
+      "Bash(# Find all files with DM_ references \\(config env variables\\) grep -rn \"\"DM_\"\" --include=\"\"*.go\"\" . --include=\"\"*.env*\"\" .)",
+      "Bash(tree:*)",
+      "Bash(sqlite3:*)",
+      "Bash(timeout:*)"
     ]
   }
 }

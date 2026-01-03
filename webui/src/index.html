@@ -26,6 +26,11 @@
                         class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors">
                         Devices
                     </button>
+                    <button @click="currentView = 'networks'"
+                        :class="currentView === 'networks' ? 'border-blue-500 text-blue-600 dark:text-blue-400' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300'"
+                        class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors">
+                        Networks
+                    </button>
                     <button @click="currentView = 'datacenters'"
                         :class="currentView === 'datacenters' ? 'border-blue-500 text-blue-600 dark:text-blue-400' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300'"
                         class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors">
@@ -113,6 +118,8 @@
                                                         <span x-text="addr.ip"></span>
                                                         <span x-show="addr.port" x-text="':' + addr.port"></span>
                                                         <span x-show="addr.label" class="text-gray-400 dark:text-gray-500" x-text="' (' + addr.label + ')'"></span>
+                                                        <span x-show="addr.network_name" class="text-gray-400 dark:text-gray-500" x-text="' [' + addr.network_name + ']'"></span>
+                                                        <span x-show="addr.switch_port" class="text-gray-400 dark:text-gray-500" x-text="' port:' + addr.switch_port + '\''"></span>
                                                     </div>
                                                 </template>
                                                 <div x-show="!device.addresses || device.addresses.length === 0" class="text-gray-400 dark:text-gray-500">—</div>
@@ -207,6 +214,11 @@
                                         </select>
                                     </div>
                                     <div>
+                                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Username</label>
+                                        <input type="text" x-model="form.username" placeholder="SSH username (e.g., root, admin)"
+                                            class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white text-gray-900 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100">
+                                    </div>
+                                    <div>
                                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Tags (comma-separated)</label>
                                         <input type="text" x-model="form.tagsInput" placeholder="server, production, web"
                                             class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white text-gray-900 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100">
@@ -220,24 +232,37 @@
                                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Addresses</label>
                                         <div class="space-y-2 mt-1">
                                             <template x-for="(addr, index) in form.addresses" :key="index">
-                                                <div class="flex gap-2 items-center flex-wrap">
-                                                    <input type="text" x-model="addr.ip" placeholder="IP Address" required
-                                                        class="flex-1 min-w-[150px] px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm bg-white text-gray-900 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100">
-                                                    <input type="number" x-model="addr.port" placeholder="Port"
-                                                        class="w-20 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm bg-white text-gray-900 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100">
-                                                    <select x-model="addr.type"
-                                                        class="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm bg-white text-gray-900 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100">
-                                                        <option value="ipv4">IPv4</option>
-                                                        <option value="ipv6">IPv6</option>
-                                                    </select>
-                                                    <input type="text" x-model="addr.label" placeholder="Label"
-                                                        class="w-24 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm bg-white text-gray-900 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100">
-                                                    <button type="button" @click="removeAddress(index)"
-                                                        class="px-3 py-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition-colors shrink-0 dark:bg-red-900 dark:text-red-300 dark:hover:bg-red-800">
-                                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                                                        </svg>
-                                                    </button>
+                                                <div class="border border-gray-200 dark:border-gray-700 rounded-lg p-3 space-y-2">
+                                                    <div class="flex gap-2 items-center flex-wrap">
+                                                        <input type="text" x-model="addr.ip" placeholder="IP Address" required
+                                                            class="flex-1 min-w-[150px] px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm bg-white text-gray-900 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100">
+                                                        <input type="number" x-model="addr.port" placeholder="Port"
+                                                            class="w-20 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm bg-white text-gray-900 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100">
+                                                        <select x-model="addr.type"
+                                                            class="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm bg-white text-gray-900 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100">
+                                                            <option value="ipv4">IPv4</option>
+                                                            <option value="ipv6">IPv6</option>
+                                                        </select>
+                                                        <input type="text" x-model="addr.label" placeholder="Label"
+                                                            class="w-24 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm bg-white text-gray-900 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100">
+                                                        <button type="button" @click="removeAddress(index)"
+                                                            class="px-3 py-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition-colors shrink-0 dark:bg-red-900 dark:text-red-300 dark:hover:bg-red-800">
+                                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                                                            </svg>
+                                                        </button>
+                                                    </div>
+                                                    <div class="flex gap-2 items-center flex-wrap">
+                                                        <select x-model="addr.network_id"
+                                                            class="flex-1 min-w-[150px] px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm bg-white text-gray-900 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100">
+                                                            <option value="">No network</option>
+                                                            <template x-for="network in networks" :key="network.id">
+                                                                <option :value="network.id" x-text="network.name + ' (' + network.subnet + ')'"></option>
+                                                            </template>
+                                                        </select>
+                                                        <input type="text" x-model="addr.switch_port" placeholder="Switch Port (e.g., eth0, Gi1/0/1)"
+                                                            class="flex-1 min-w-[150px] px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm bg-white text-gray-900 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100">
+                                                    </div>
                                                 </div>
                                             </template>
                                             <button type="button" @click="addAddress()"
@@ -312,16 +337,26 @@
                                         <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Datacenter</p>
                                         <p class="mt-1 text-gray-900 dark:text-gray-100" x-text="currentDevice.datacenter_name"></p>
                                     </div>
+                                    <div x-show="currentDevice.username">
+                                        <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Username</p>
+                                        <p class="mt-1 text-gray-900 dark:text-gray-100 font-mono" x-text="currentDevice.username"></p>
+                                    </div>
                                     <div x-show="currentDevice.addresses && currentDevice.addresses.length > 0">
                                         <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Addresses</p>
-                                        <div class="mt-1 space-y-1">
+                                        <div class="mt-1 space-y-2">
                                             <template x-for="addr in currentDevice.addresses" :key="addr.ip">
-                                                <p class="text-gray-900 dark:text-gray-100">
-                                                    <span x-text="addr.ip"></span>
-                                                    <span x-show="addr.port" x-text="':' + addr.port"></span>
-                                                    <span x-show="addr.label" class="text-gray-500 dark:text-gray-400" x-text="' (' + addr.label + ')'"></span>
-                                                    <span class="text-xs bg-gray-100 px-2 py-0.5 rounded text-gray-600 dark:bg-gray-700 dark:text-gray-300" x-text="addr.type"></span>
-                                                </p>
+                                                <div class="border border-gray-200 dark:border-gray-700 rounded p-2">
+                                                    <div class="flex flex-wrap gap-2 items-center">
+                                                        <span class="text-gray-900 dark:text-gray-100 font-mono" x-text="addr.ip"></span>
+                                                        <span x-show="addr.port" class="text-gray-600 dark:text-gray-400" x-text="':' + addr.port"></span>
+                                                        <span x-show="addr.label" class="text-gray-500 dark:text-gray-400" x-text="' (' + addr.label + ')'"></span>
+                                                        <span class="text-xs bg-gray-100 px-2 py-0.5 rounded text-gray-600 dark:bg-gray-700 dark:text-gray-300" x-text="addr.type"></span>
+                                                    </div>
+                                                    <div class="flex flex-wrap gap-2 text-sm text-gray-600 dark:text-gray-400 mt-1">
+                                                        <span x-show="addr.network_name" x-text="'Network: ' + addr.network_name"></span>
+                                                        <span x-show="addr.switch_port" x-text="'Port: ' + addr.switch_port"></span>
+                                                    </div>
+                                                </div>
                                             </template>
                                         </div>
                                     </div>
@@ -355,6 +390,221 @@
                                         Edit
                                     </button>
                                     <button @click="deleteCurrentDevice()"
+                                        class="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors dark:bg-red-500 dark:hover:bg-red-600">
+                                        Delete
+                                    </button>
+                                    <button @click="closeViewModal()"
+                                        class="flex-1 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600">
+                                        Close
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Toast Notification -->
+            <div x-show="toast.show" x-transition:enter="ease-out duration-300" x-transition:enter-start="opacity-0 transform translate-y-2"
+                x-transition:enter-end="opacity-100 transform translate-y-0" x-transition:leave="ease-in duration-200"
+                x-transition:leave-start="opacity-100 transform translate-y-0" x-transition:leave-end="opacity-0 transform translate-y-2"
+                :class="toast.type === 'error' ? 'bg-red-500' : toast.type === 'success' ? 'bg-green-500' : 'bg-blue-500'"
+                class="fixed bottom-4 right-4 text-white px-6 py-3 rounded-lg shadow-lg z-50 flex items-center space-x-2">
+                <span x-text="toast.message"></span>
+                <button @click="toast.show = false" class="ml-4 hover:opacity-80">&times;</button>
+            </div>
+        </div>
+
+        <!-- Networks View -->
+        <div x-data="networkManager" x-show="currentView === 'networks'" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+            <!-- Network Header -->
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-bold text-gray-900 dark:text-gray-100">Networks</h2>
+                <button @click="openAddModal()"
+                    class="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors dark:bg-blue-500 dark:hover:bg-blue-600">
+                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                    </svg>
+                    Add Network
+                </button>
+            </div>
+
+            <!-- Loading State -->
+            <div x-show="loading" class="text-center py-12">
+                <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-blue-600 border-t-transparent dark:border-blue-400"></div>
+                <p class="mt-2 text-gray-600 dark:text-gray-400">Loading networks...</p>
+            </div>
+
+            <!-- Network List -->
+            <div x-show="!loading" class="bg-white rounded-lg shadow overflow-hidden dark:bg-gray-800">
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                        <thead class="bg-gray-50 dark:bg-gray-700">
+                            <tr>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-gray-300">Name</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-gray-300">Subnet</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-gray-300">Datacenter</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-gray-300">Description</th>
+                                <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-gray-300">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200 dark:bg-gray-800 dark:divide-gray-700">
+                            <template x-for="network in networks" :key="network.id">
+                                <tr class="hover:bg-gray-50 dark:hover:bg-gray-700">
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <div class="text-sm font-medium text-gray-900 cursor-pointer hover:text-blue-600 dark:text-gray-100 dark:hover:text-blue-400" @click="viewNetwork(network.id)" x-text="network.name"></div>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <div class="text-sm text-gray-900 dark:text-gray-100 font-mono" x-text="network.subnet"></div>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300" x-text="network.datacenter_name || '—'"></td>
+                                    <td class="px-6 py-4 text-sm text-gray-600 dark:text-gray-300" x-text="network.description || '—'"></td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                        <button @click="viewNetwork(network.id)" class="text-blue-600 hover:text-blue-900 mr-3 dark:text-blue-400 dark:hover:text-blue-300">View</button>
+                                        <button @click="editNetwork(network.id)" class="text-indigo-600 hover:text-indigo-900 mr-3 dark:text-indigo-400 dark:hover:text-indigo-300">Edit</button>
+                                        <button @click="deleteNetwork(network.id)" class="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300">Delete</button>
+                                    </td>
+                                </tr>
+                            </template>
+                            <tr x-show="networks.length === 0 && !loading">
+                                <td colspan="5" class="px-6 py-12 text-center">
+                                    <div class="text-gray-400 dark:text-gray-500">
+                                        <svg class="mx-auto h-12 w-12 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
+                                        </svg>
+                                        <p class="text-lg font-medium">No networks found</p>
+                                        <p class="text-sm mt-1">Get started by adding your first network</p>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Add/Edit Modal -->
+            <div x-show="showModal" class="fixed inset-0 z-50 overflow-y-auto" role="dialog" aria-modal="true">
+                <div class="flex min-h-screen items-center justify-center p-4">
+                    <div x-show="showModal" x-transition:enter="ease-out duration-300" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
+                        x-transition:leave="ease-in duration-200" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"
+                        @click="closeModal()" class="fixed inset-0 bg-gray-900/20 backdrop-blur-sm transition-opacity dark:bg-gray-900/50"></div>
+                    <div x-show="showModal" x-transition:enter="ease-out duration-300" x-transition:enter-start="opacity-0 scale-95"
+                        x-transition:enter-end="opacity-100 scale-100" x-transition:leave="ease-in duration-200"
+                        x-transition:leave-start="opacity-100 scale-100" x-transition:leave-end="opacity-0 scale-95"
+                        class="relative z-10 w-full max-w-lg bg-white rounded-lg shadow-xl dark:bg-gray-800">
+                        <div class="flex flex-col max-h-[90vh]">
+                            <!-- Header -->
+                            <div class="flex items-center justify-between border-b border-gray-200 px-6 py-4 dark:border-gray-700">
+                                <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100" x-text="modalTitle"></h3>
+                                <button type="button" @click="closeModal()" class="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300">
+                                    <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                                    </svg>
+                                </button>
+                            </div>
+                            <!-- Form -->
+                            <div class="flex-1 overflow-y-auto px-6 py-4">
+                                <form @submit.prevent="saveNetwork" class="space-y-4">
+                                    <input type="hidden" x-model="form.id">
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Name *</label>
+                                        <input type="text" x-model="form.name" required
+                                            class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white text-gray-900 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100">
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Subnet (CIDR) *</label>
+                                        <input type="text" x-model="form.subnet" placeholder="192.168.1.0/24" required
+                                            class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white text-gray-900 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100">
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Datacenter *</label>
+                                        <select x-model="form.datacenter_id" required
+                                            class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white text-gray-900 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100">
+                                            <option value="">Select a datacenter</option>
+                                            <template x-for="dc in datacenters" :key="dc.id">
+                                                <option :value="dc.id" x-text="dc.name"></option>
+                                            </template>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Description</label>
+                                        <textarea x-model="form.description" rows="3"
+                                            class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white text-gray-900 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"></textarea>
+                                    </div>
+                                </form>
+                            </div>
+                            <!-- Footer -->
+                            <div class="border-t border-gray-200 px-6 py-4 bg-gray-50 dark:border-gray-700 dark:bg-gray-900">
+                                <div class="flex gap-3">
+                                    <button type="submit" @click="saveNetwork" :disabled="saving"
+                                        class="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors dark:bg-blue-500 dark:hover:bg-blue-600">
+                                        <span x-show="!saving">Save</span>
+                                        <span x-show="saving">Saving...</span>
+                                    </button>
+                                    <button type="button" @click="closeModal()"
+                                        class="flex-1 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600">
+                                        Cancel
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- View Modal -->
+            <div x-show="showViewModal" class="fixed inset-0 z-50 overflow-y-auto" role="dialog" aria-modal="true">
+                <div class="flex min-h-screen items-center justify-center p-4">
+                    <div x-show="showViewModal" x-transition:enter="ease-out duration-300" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
+                        x-transition:leave="ease-in duration-200" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"
+                        @click="closeViewModal()" class="fixed inset-0 bg-gray-900/20 backdrop-blur-sm transition-opacity dark:bg-gray-900/50"></div>
+                    <div x-show="showViewModal" x-transition:enter="ease-out duration-300" x-transition:enter-start="opacity-0 scale-95"
+                        x-transition:enter-end="opacity-100 scale-100" x-transition:leave="ease-in duration-200"
+                        x-transition:leave-start="opacity-100 scale-100" x-transition:leave-end="opacity-0 scale-95"
+                        class="relative z-10 w-full max-w-lg bg-white rounded-lg shadow-xl dark:bg-gray-800">
+                        <div class="flex flex-col max-h-[90vh]">
+                            <!-- Header -->
+                            <div class="flex items-center justify-between border-b border-gray-200 px-6 py-4 dark:border-gray-700">
+                                <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Network Details</h3>
+                                <button type="button" @click="closeViewModal()" class="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300">
+                                    <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                                    </svg>
+                                </button>
+                            </div>
+                            <!-- Scrollable Content -->
+                            <div class="flex-1 overflow-y-auto px-6 py-4">
+                                <div class="space-y-4">
+                                    <div>
+                                        <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Name</p>
+                                        <p class="mt-1 text-gray-900 dark:text-gray-100" x-text="currentNetwork.name"></p>
+                                    </div>
+                                    <div>
+                                        <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Subnet</p>
+                                        <p class="mt-1 text-gray-900 dark:text-gray-100 font-mono" x-text="currentNetwork.subnet"></p>
+                                    </div>
+                                    <div>
+                                        <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Datacenter</p>
+                                        <p class="mt-1 text-gray-900 dark:text-gray-100" x-text="currentNetwork.datacenter_name"></p>
+                                    </div>
+                                    <div x-show="currentNetwork.description">
+                                        <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Description</p>
+                                        <p class="mt-1 text-gray-900 dark:text-gray-100 whitespace-pre-wrap" x-text="currentNetwork.description"></p>
+                                    </div>
+                                    <div>
+                                        <p class="text-sm font-medium text-gray-500 dark:text-gray-400">ID</p>
+                                        <p class="mt-1 text-sm text-gray-500 font-mono break-all dark:text-gray-400" x-text="currentNetwork.id"></p>
+                                    </div>
+                                </div>
+                            </div>
+                            <!-- Footer with Buttons -->
+                            <div class="border-t border-gray-200 px-6 py-4 bg-gray-50 dark:border-gray-700 dark:bg-gray-900">
+                                <div class="flex gap-3">
+                                    <button @click="editCurrentNetwork()"
+                                        class="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors dark:bg-blue-500 dark:hover:bg-blue-600">
+                                        Edit
+                                    </button>
+                                    <button @click="deleteCurrentNetwork()"
                                         class="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors dark:bg-red-500 dark:hover:bg-red-600">
                                         Delete
                                     </button>

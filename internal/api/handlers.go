@@ -34,6 +34,14 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("DELETE /api/datacenters/{id}", h.deleteDatacenter)
 	mux.HandleFunc("GET /api/datacenters/{id}/devices", h.getDatacenterDevices)
 
+	// Network CRUD
+	mux.HandleFunc("GET /api/networks", h.listNetworks)
+	mux.HandleFunc("POST /api/networks", h.createNetwork)
+	mux.HandleFunc("GET /api/networks/{id}", h.getNetwork)
+	mux.HandleFunc("PUT /api/networks/{id}", h.updateNetwork)
+	mux.HandleFunc("DELETE /api/networks/{id}", h.deleteNetwork)
+	mux.HandleFunc("GET /api/networks/{id}/devices", h.getNetworkDevices)
+
 	// Device CRUD
 	mux.HandleFunc("GET /api/devices", h.listDevices)
 	mux.HandleFunc("POST /api/devices", h.createDevice)
@@ -551,6 +559,204 @@ func (h *Handler) getDatacenterDevices(w http.ResponseWriter, r *http.Request) {
 
 // generateDatacenterID generates a UUIDv7 for a datacenter
 func generateDatacenterID() string {
+	// Use uuid.New() which generates UUIDv7
+	return uuid.New().String()
+}
+
+// Network CRUD handlers
+
+// listNetworks handles GET /api/networks
+func (h *Handler) listNetworks(w http.ResponseWriter, r *http.Request) {
+	name := r.URL.Query().Get("name")
+	datacenterID := r.URL.Query().Get("datacenter_id")
+	filter := &model.NetworkFilter{Name: name, DatacenterID: datacenterID}
+
+	// Check if storage supports networks
+	netStorage, ok := h.storage.(storage.NetworkStorage)
+	if !ok {
+		h.writeError(w, http.StatusNotImplemented, "networks are not supported by this storage backend")
+		return
+	}
+
+	networks, err := netStorage.ListNetworks(filter)
+	if err != nil {
+		h.internalError(w, err)
+		return
+	}
+
+	h.writeJSON(w, http.StatusOK, networks)
+}
+
+// getNetwork handles GET /api/networks/{id}
+func (h *Handler) getNetwork(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	if id == "" {
+		h.writeError(w, http.StatusBadRequest, "network ID required")
+		return
+	}
+
+	netStorage, ok := h.storage.(storage.NetworkStorage)
+	if !ok {
+		h.writeError(w, http.StatusNotImplemented, "networks are not supported by this storage backend")
+		return
+	}
+
+	network, err := netStorage.GetNetwork(id)
+	if err != nil {
+		if errors.Is(err, storage.ErrNetworkNotFound) {
+			h.writeError(w, http.StatusNotFound, "network not found")
+			return
+		}
+		h.internalError(w, err)
+		return
+	}
+
+	h.writeJSON(w, http.StatusOK, network)
+}
+
+// createNetwork handles POST /api/networks
+func (h *Handler) createNetwork(w http.ResponseWriter, r *http.Request) {
+	var network model.Network
+	if err := json.NewDecoder(r.Body).Decode(&network); err != nil {
+		h.writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	// Validate required fields
+	if network.Name == "" {
+		h.writeError(w, http.StatusBadRequest, "name is required")
+		return
+	}
+	if network.Subnet == "" {
+		h.writeError(w, http.StatusBadRequest, "subnet is required")
+		return
+	}
+	if network.DatacenterID == "" {
+		h.writeError(w, http.StatusBadRequest, "datacenter_id is required")
+		return
+	}
+
+	// Generate ID if not provided
+	if network.ID == "" {
+		network.ID = generateNetworkID()
+	}
+
+	netStorage, ok := h.storage.(storage.NetworkStorage)
+	if !ok {
+		h.writeError(w, http.StatusNotImplemented, "networks are not supported by this storage backend")
+		return
+	}
+
+	if err := netStorage.CreateNetwork(&network); err != nil {
+		if strings.Contains(err.Error(), "UNIQUE constraint failed") {
+			h.writeError(w, http.StatusConflict, "network with this name already exists")
+			return
+		}
+		if strings.Contains(err.Error(), "FOREIGN KEY constraint failed") {
+			h.writeError(w, http.StatusBadRequest, "datacenter not found")
+			return
+		}
+		h.internalError(w, err)
+		return
+	}
+
+	h.writeJSON(w, http.StatusCreated, network)
+}
+
+// updateNetwork handles PUT /api/networks/{id}
+func (h *Handler) updateNetwork(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	if id == "" {
+		h.writeError(w, http.StatusBadRequest, "network ID required")
+		return
+	}
+
+	var network model.Network
+	if err := json.NewDecoder(r.Body).Decode(&network); err != nil {
+		h.writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	// Ensure ID matches URL
+	network.ID = id
+
+	netStorage, ok := h.storage.(storage.NetworkStorage)
+	if !ok {
+		h.writeError(w, http.StatusNotImplemented, "networks are not supported by this storage backend")
+		return
+	}
+
+	if err := netStorage.UpdateNetwork(&network); err != nil {
+		if errors.Is(err, storage.ErrNetworkNotFound) {
+			h.writeError(w, http.StatusNotFound, "network not found")
+			return
+		}
+		if strings.Contains(err.Error(), "UNIQUE constraint failed") {
+			h.writeError(w, http.StatusConflict, "network with this name already exists")
+			return
+		}
+		if strings.Contains(err.Error(), "FOREIGN KEY constraint failed") {
+			h.writeError(w, http.StatusBadRequest, "datacenter not found")
+			return
+		}
+		h.internalError(w, err)
+		return
+	}
+
+	h.writeJSON(w, http.StatusOK, network)
+}
+
+// deleteNetwork handles DELETE /api/networks/{id}
+func (h *Handler) deleteNetwork(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	if id == "" {
+		h.writeError(w, http.StatusBadRequest, "network ID required")
+		return
+	}
+
+	netStorage, ok := h.storage.(storage.NetworkStorage)
+	if !ok {
+		h.writeError(w, http.StatusNotImplemented, "networks are not supported by this storage backend")
+		return
+	}
+
+	if err := netStorage.DeleteNetwork(id); err != nil {
+		if errors.Is(err, storage.ErrNetworkNotFound) {
+			h.writeError(w, http.StatusNotFound, "network not found")
+			return
+		}
+		h.internalError(w, err)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// getNetworkDevices handles GET /api/networks/{id}/devices
+func (h *Handler) getNetworkDevices(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	if id == "" {
+		h.writeError(w, http.StatusBadRequest, "network ID required")
+		return
+	}
+
+	netStorage, ok := h.storage.(storage.NetworkStorage)
+	if !ok {
+		h.writeError(w, http.StatusNotImplemented, "networks are not supported by this storage backend")
+		return
+	}
+
+	devices, err := netStorage.GetNetworkDevices(id)
+	if err != nil {
+		h.internalError(w, err)
+		return
+	}
+
+	h.writeJSON(w, http.StatusOK, devices)
+}
+
+// generateNetworkID generates a UUIDv7 for a network
+func generateNetworkID() string {
 	// Use uuid.New() which generates UUIDv7
 	return uuid.New().String()
 }

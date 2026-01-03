@@ -13,6 +13,7 @@ var (
 	ErrDeviceNotFound     = errors.New("device not found")
 	ErrInvalidID          = errors.New("invalid device ID")
 	ErrDatacenterNotFound = errors.New("datacenter not found")
+	ErrNetworkNotFound    = errors.New("network not found")
 )
 
 // NewStorage creates a SQLite storage backend
@@ -33,6 +34,16 @@ type DatacenterStorage interface {
 	UpdateDatacenter(dc *model.Datacenter) error
 	DeleteDatacenter(id string) error
 	GetDatacenterDevices(datacenterID string) ([]model.Device, error)
+}
+
+// NetworkStorage defines the interface for network storage
+type NetworkStorage interface {
+	ListNetworks(filter *model.NetworkFilter) ([]model.Network, error)
+	GetNetwork(id string) (*model.Network, error)
+	CreateNetwork(network *model.Network) error
+	UpdateNetwork(network *model.Network) error
+	DeleteNetwork(id string) error
+	GetNetworkDevices(networkID string) ([]model.Device, error)
 }
 
 // RelationshipStorage defines the interface for device relationships
