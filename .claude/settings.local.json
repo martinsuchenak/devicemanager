@@ -15,7 +15,8 @@
       "Bash(~/.bun/bin/bun run build:*)",
       "WebSearch",
       "Bash(DM_STORAGE_BACKEND=sqlite timeout:*)",
-      "Bash(./build/devicemanager:*)"
+      "Bash(./build/devicemanager:*)",
+      "Bash(# Find all files with DM_ references \\(config env variables\\) grep -rn \"\"DM_\"\" --include=\"\"*.go\"\" . --include=\"\"*.env*\"\" .)"
     ]
   }
 }

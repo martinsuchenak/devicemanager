@@ -10,9 +10,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/martinsuchenak/devicemanager/internal/config"
-	"github.com/martinsuchenak/devicemanager/internal/model"
-	"github.com/martinsuchenak/devicemanager/internal/storage"
+	"github.com/martinsuchenak/rackd/internal/config"
+	"github.com/martinsuchenak/rackd/internal/model"
+	"github.com/martinsuchenak/rackd/internal/storage"
 	"github.com/paularlott/cli"
 )
 
@@ -25,7 +25,7 @@ var (
 func main() {
 	// Load configuration
 	cfg = config.Load(nil)
-	serverURL = getEnv("DM_SERVER_URL", "http://localhost"+cfg.ListenAddr)
+	serverURL = getEnv("RACKD_SERVER_URL", "http://localhost"+cfg.ListenAddr)
 
 	// Try to initialize local storage for offline use
 	var err error
@@ -35,10 +35,10 @@ func main() {
 	}
 
 	rootCmd := &cli.Command{
-		Name:        "devicemanager",
+		Name:        "rackd",
 		Version:     "1.0.0",
-		Usage:       "Device Manager CLI",
-		Description: "Manage your device inventory",
+		Usage:       "Rackd CLI",
+		Description: "Manage your device inventory with Rackd",
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:         "server",

@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/martinsuchenak/devicemanager/internal/model"
-	"github.com/martinsuchenak/devicemanager/internal/storage"
+	"github.com/martinsuchenak/rackd/internal/model"
+	"github.com/martinsuchenak/rackd/internal/storage"
 )
 
 // Handler handles HTTP requests

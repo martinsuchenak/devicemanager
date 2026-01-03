@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/martinsuchenak/devicemanager/internal/model"
+	"github.com/martinsuchenak/rackd/internal/model"
 )
 
 var (

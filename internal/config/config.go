@@ -46,11 +46,11 @@ func Load(opts *Config) *Config {
 	}
 
 	// Then load environment variables (only if not already set by .env)
-	cfg.DataDir = coalesce(cfg.DataDir, os.Getenv("DM_DATA_DIR"), "./data")
-	cfg.ListenAddr = coalesce(cfg.ListenAddr, os.Getenv("DM_LISTEN_ADDR"), ":8080")
-	cfg.BearerToken = coalesce(cfg.BearerToken, os.Getenv("DM_BEARER_TOKEN"), "")
-	cfg.StorageBackend = coalesce(cfg.StorageBackend, os.Getenv("DM_STORAGE_BACKEND"), "sqlite")
-	cfg.StorageFormat = coalesce(cfg.StorageFormat, os.Getenv("DM_STORAGE_FORMAT"), "json")
+	cfg.DataDir = coalesce(cfg.DataDir, os.Getenv("RACKD_DATA_DIR"), "./data")
+	cfg.ListenAddr = coalesce(cfg.ListenAddr, os.Getenv("RACKD_LISTEN_ADDR"), ":8080")
+	cfg.BearerToken = coalesce(cfg.BearerToken, os.Getenv("RACKD_BEARER_TOKEN"), "")
+	cfg.StorageBackend = coalesce(cfg.StorageBackend, os.Getenv("RACKD_STORAGE_BACKEND"), "sqlite")
+	cfg.StorageFormat = coalesce(cfg.StorageFormat, os.Getenv("RACKD_STORAGE_FORMAT"), "json")
 
 	// Finally, apply CLI opts if provided (highest priority)
 	if opts != nil {
@@ -114,15 +114,15 @@ func loadFromEnvFile(cfg *Config, filename string) error {
 
 		// Map .env keys to config fields
 		switch key {
-		case "DM_DATA_DIR":
+		case "RACKD_DATA_DIR":
 			cfg.DataDir = value
-		case "DM_LISTEN_ADDR":
+		case "RACKD_LISTEN_ADDR":
 			cfg.ListenAddr = value
-		case "DM_BEARER_TOKEN":
+		case "RACKD_BEARER_TOKEN":
 			cfg.BearerToken = value
-		case "DM_STORAGE_BACKEND":
+		case "RACKD_STORAGE_BACKEND":
 			cfg.StorageBackend = value
-		case "DM_STORAGE_FORMAT":
+		case "RACKD_STORAGE_FORMAT":
 			cfg.StorageFormat = value
 		}
 	}

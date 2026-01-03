@@ -1,4 +1,4 @@
-# Device Manager
+# Rackd
 
 A Go-based device tracking application with MCP server support, web UI, and CLI.
 
@@ -41,7 +41,7 @@ The build process automatically:
 
 ```bash
 # Run server with default settings (SQLite storage)
-./build/devicemanager
+./build/rackd
 
 # Or use the Makefile target
 make run-server
@@ -59,14 +59,14 @@ The server will start on `http://localhost:8080`:
 docker-compose up -d
 
 # Or build and run manually
-docker build -t devicemanager .
-docker run -p 8080:8080 -v $(pwd)/data:/app/data devicemanager
+docker build -t rackd .
+docker run -p 8080:8080 -v $(pwd)/data:/app/data rackd
 ```
 
 ### Nomad Deployment
 
 ```bash
-nomad job run deployment/nomad/devicemanager.nomad
+nomad job run deployment/nomad/rackd.nomad
 ```
 
 ## Configuration
@@ -87,44 +87,44 @@ Create a `.env` file in the current directory:
 cp .env.example .env
 
 # Edit with your settings
-# DM_DATA_DIR=./data
-# DM_LISTEN_ADDR=:8080
-# DM_STORAGE_BACKEND=sqlite
-# DM_STORAGE_FORMAT=json
-# DM_BEARER_TOKEN=
+# RACKD_DATA_DIR=./data
+# RACKD_LISTEN_ADDR=:8080
+# RACKD_STORAGE_BACKEND=sqlite
+# RACKD_STORAGE_FORMAT=json
+# RACKD_BEARER_TOKEN=
 ```
 
 ### CLI Flags
 
 ```bash
-./devicemanager -data-dir /custom/data -addr :9000 -storage file
+./rackd -data-dir /custom/data -addr :9000 -storage file
 ```
 
 | Flag | ENV Variable | Default | Description |
 |------|--------------|---------|-------------|
-| `-data-dir` | `DM_DATA_DIR` | `./data` | Directory for device data/database |
-| `-addr` | `DM_LISTEN_ADDR` | `:8080` | Server listen address |
-| `-storage` | `DM_STORAGE_BACKEND` | `sqlite` | Storage backend: `sqlite` or `file` |
-| `-format` | `DM_STORAGE_FORMAT` | `json` | Storage format for file backend: `json` or `toml` |
-| `-token` | `DM_BEARER_TOKEN` | (none) | MCP authentication token |
+| `-data-dir` | `RACKD_DATA_DIR` | `./data` | Directory for device data/database |
+| `-addr` | `RACKD_LISTEN_ADDR` | `:8080` | Server listen address |
+| `-storage` | `RACKD_STORAGE_BACKEND` | `sqlite` | Storage backend: `sqlite` or `file` |
+| `-format` | `RACKD_STORAGE_FORMAT` | `json` | Storage format for file backend: `json` or `toml` |
+| `-token` | `RACKD_BEARER_TOKEN` | (none) | MCP authentication token |
 
 ### Configuration Examples
 
 ```bash
 # Use defaults (sqlite storage, :8080, ./data)
-./devicemanager
+./rackd
 
 # Use .env file for configuration
 cp .env.example .env
-./devicemanager
+./rackd
 
 # Override specific settings with CLI flags
-./devicemanager -data-dir /mnt/data -addr :9999
+./rackd -data-dir /mnt/data -addr :9999
 
 # Use environment variables
-export DM_DATA_DIR=/custom/data
-export DM_LISTEN_ADDR=:8080
-./devicemanager
+export RACKD_DATA_DIR=/custom/data
+export RACKD_LISTEN_ADDR=:8080
+./rackd
 ```
 
 ### Storage Backends
@@ -139,14 +139,14 @@ SQLite is the recommended backend and provides:
 
 ```bash
 # Using .env file
-echo "DM_STORAGE_BACKEND=sqlite" > .env
-./devicemanager
+echo "RACKD_STORAGE_BACKEND=sqlite" > .env
+./rackd
 
 # Using CLI flag
-./devicemanager -storage sqlite
+./rackd -storage sqlite
 
 # Using environment variable
-DM_STORAGE_BACKEND=sqlite ./devicemanager
+RACKD_STORAGE_BACKEND=sqlite ./rackd
 ```
 
 #### File-Based Storage
@@ -155,15 +155,15 @@ File-based storage stores each device as a separate file (JSON or TOML format).
 
 ```bash
 # Using .env file
-echo "DM_STORAGE_BACKEND=file" >> .env
-echo "DM_STORAGE_FORMAT=json" >> .env
-./devicemanager
+echo "RACKD_STORAGE_BACKEND=file" >> .env
+echo "RACKD_STORAGE_FORMAT=json" >> .env
+./rackd
 
 # Using CLI flags
-./devicemanager -storage file -format json
+./rackd -storage file -format json
 
 # Using environment variables
-DM_STORAGE_BACKEND=file DM_STORAGE_FORMAT=toml ./devicemanager
+RACKD_STORAGE_BACKEND=file RACKD_STORAGE_FORMAT=toml ./rackd
 ```
 
 ### Device Relationships (SQLite only)
@@ -196,7 +196,7 @@ Supported relationship types:
 make cli
 
 # Add a device
-./build/dm-cli add \
+./build/rackd-cli add \
   --name "web-server-01" \
   --make-model "Dell PowerEdge R740" \
   --os "Ubuntu 22.04" \
@@ -205,27 +205,27 @@ make cli
   --domains "example.com,www.example.com"
 
 # List all devices
-./build/dm-cli list
+./build/rackd-cli list
 
 # Filter by tags
-./build/dm-cli list --filter server,production
+./build/rackd-cli list --filter server,production
 
 # Get device details
-./build/dm-cli get web-server-01
+./build/rackd-cli get web-server-01
 
 # Search devices
-./build/dm-cli search "dell"
+./build/rackd-cli search "dell"
 
 # Update a device
-./build/dm-cli update web-server-01 \
+./build/rackd-cli update web-server-01 \
   --location "Rack B2" \
   --tags "server,production,web,backend"
 
 # Delete a device
-./build/dm-cli delete web-server-01
+./build/rackd-cli delete web-server-01
 
 # Use local storage instead of server
-./build/dm-cli --local add --name "local-device"
+./build/rackd-cli --local add --name "local-device"
 ```
 
 ## REST API
@@ -363,7 +363,7 @@ Configure your MCP client (e.g., Claude Desktop) to connect:
 ```json
 {
   "mcpServers": {
-    "devicemanager": {
+    "rackd": {
       "url": "http://localhost:8080/mcp",
       "headers": {
         "Authorization": "Bearer your-token-here"
@@ -425,7 +425,7 @@ Built assets are embedded into the Go binary at compile time using `go:embed`.
 ### Project Structure
 
 ```
-devicemanager/
+rackd/
 ├── cmd/
 │   ├── server/          # HTTP server + MCP endpoint
 │   └── cli/             # CLI tool

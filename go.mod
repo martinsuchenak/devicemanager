@@ -1,4 +1,4 @@
-module github.com/martinsuchenak/devicemanager
+module github.com/martinsuchenak/rackd
 
 go 1.25.3
 

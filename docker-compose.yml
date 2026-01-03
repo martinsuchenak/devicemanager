@@ -1,20 +1,20 @@
 version: '3.8'
 
 services:
-  devicemanager:
+  rackd:
     build: .
-    container_name: devicemanager
+    container_name: rackd
     ports:
       - "8080:8080"
     volumes:
       # Persist data directory
-      - devicemanager-data:/app/data
+      - rackd-data:/app/data
     environment:
-      - DM_DATA_DIR=/app/data
-      - DM_LISTEN_ADDR=:8080
-      - DM_STORAGE_FORMAT=json
+      - RACKD_DATA_DIR=/app/data
+      - RACKD_LISTEN_ADDR=:8080
+      - RACKD_STORAGE_FORMAT=json
       # Optional: Enable MCP authentication
-      # - DM_BEARER_TOKEN=your-secret-token-here
+      # - RACKD_BEARER_TOKEN=your-secret-token-here
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/api/devices"]
@@ -24,5 +24,5 @@ services:
       start_period: 5s
 
 volumes:
-  devicemanager-data:
+  rackd-data:
     driver: local

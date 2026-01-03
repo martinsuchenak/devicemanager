@@ -15,7 +15,7 @@ import (
 
 	_ "modernc.org/sqlite"
 
-	"github.com/martinsuchenak/devicemanager/internal/model"
+	"github.com/martinsuchenak/rackd/internal/model"
 )
 
 //go:embed schema.sql

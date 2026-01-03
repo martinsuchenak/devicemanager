@@ -1,4 +1,4 @@
-job "devicemanager" {
+job "rackd" {
   datacenters = ["dc1"]
   type        = "service"
 
@@ -19,14 +19,14 @@ job "devicemanager" {
     volume "data" {
       type            = "host"
       read_only       = false
-      source          = "devicemanager-data"
+      source          = "rackd-data"
       attachment_mode = "file-system"
       # Create directory if it doesn't exist
       per_alloc       = true
     }
 
     service {
-      name = "devicemanager"
+      name = "rackd"
       port = "http"
 
       tags = [
@@ -40,7 +40,7 @@ job "devicemanager" {
         interval = "30s"
         timeout  = "3s"
         header {
-          Authorization = ["Bearer ${nomad_var_dm_bearer_token}"]
+          Authorization = ["Bearer ${nomad_var_rackd_bearer_token}"]
         }
       }
 
@@ -53,7 +53,7 @@ job "devicemanager" {
       driver = "docker"
 
       config {
-        image = "ghcr.io/martinsuchenak/devicemanager:latest"
+        image = "ghcr.io/martinsuchenak/rackd:latest"
 
         ports = ["http"]
 
@@ -69,16 +69,16 @@ job "devicemanager" {
       }
 
       env {
-        DM_DATA_DIR       = "/app/data"
-        DM_LISTEN_ADDR    = ":8080"
-        DM_STORAGE_FORMAT = "json"
+        RACKD_DATA_DIR       = "/app/data"
+        RACKD_LISTEN_ADDR    = ":8080"
+        RACKD_STORAGE_FORMAT = "json"
       }
 
       # Optional: Pass bearer token from Nomad vars
       template {
         data        = <<-EOF
           {{ with nomad_var "dm_bearer_token" -}}
-          DM_BEARER_TOKEN={{ . }}
+          RACKD_BEARER_TOKEN={{ . }}
           {{ end -}}
         EOF
         destination = "secrets/env.txt"

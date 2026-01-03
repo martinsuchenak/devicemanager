@@ -1,6 +1,6 @@
 openapi: 3.1.0
 info:
-  title: Device Manager API
+  title: Rackd API
   description: |
     RESTful API for managing device inventory. Track devices with detailed information
     including network addresses, domains, tags, and physical locations.
@@ -21,7 +21,7 @@ info:
     - File-based (json/toml): Basic CRUD operations, no relationship support
   version: 1.0.0
   contact:
-    name: Device Manager
+    name: Rackd
   license:
     name: MIT
 

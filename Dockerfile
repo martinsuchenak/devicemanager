@@ -14,10 +14,10 @@ RUN go mod download
 COPY . .
 
 # Build the server binary
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o devicemanager ./cmd/server
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o rackd ./cmd/server
 
 # Build the CLI binary
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o dm-cli ./cmd/cli
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o rackd-cli ./cmd/cli
 
 # Runtime stage
 FROM alpine:latest
@@ -27,7 +27,7 @@ RUN apk --no-cache add ca-certificates
 WORKDIR /app
 
 # Copy the binary from builder
-COPY --from=builder /build/devicemanager .
+COPY --from=builder /build/rackd .
 COPY --from=builder /build/dm-cli /usr/local/bin/dm-cli
 
 # Create data directory
@@ -45,4 +45,4 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
     CMD wget --no-verbose --tries=1 --spider http://localhost:8080/api/devices || exit 1
 
 # Run the server
-CMD ["./devicemanager"]
+CMD ["./rackd"]

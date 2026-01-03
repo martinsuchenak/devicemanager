@@ -8,11 +8,11 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/martinsuchenak/devicemanager/internal/api"
-	"github.com/martinsuchenak/devicemanager/internal/config"
-	"github.com/martinsuchenak/devicemanager/internal/mcp"
-	"github.com/martinsuchenak/devicemanager/internal/storage"
-	"github.com/martinsuchenak/devicemanager/internal/ui"
+	"github.com/martinsuchenak/rackd/internal/api"
+	"github.com/martinsuchenak/rackd/internal/config"
+	"github.com/martinsuchenak/rackd/internal/mcp"
+	"github.com/martinsuchenak/rackd/internal/storage"
+	"github.com/martinsuchenak/rackd/internal/ui"
 )
 
 func main() {
@@ -35,7 +35,7 @@ func main() {
 
 	// Show version if requested
 	if *showVersion {
-		println("Device Manager v1.0.0")
+		println("Rackd v1.0.0")
 		os.Exit(0)
 	}
 
@@ -112,7 +112,7 @@ func main() {
 	}()
 
 	// Log startup info
-	log.Printf("Starting Device Manager server on %s", cfg.ListenAddr)
+	log.Printf("Starting Rackd server on %s", cfg.ListenAddr)
 	log.Printf("Web UI: http://localhost%s", cfg.ListenAddr)
 	log.Printf("API: http://localhost%s/api/", cfg.ListenAddr)
 	log.Printf("MCP: http://localhost%s/mcp", cfg.ListenAddr)

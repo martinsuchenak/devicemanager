@@ -1,8 +1,8 @@
-# Device Manager Makefile
+# Rackd Makefile
 
 # Variables
-BINARY_SERVER=devicemanager
-BINARY_CLI=dm-cli
+BINARY_SERVER=rackd
+BINARY_CLI=rackd-cli
 GO=go
 GOFLAGS=-v
 DOCKER=docker
@@ -26,7 +26,7 @@ BUILD_TIME=$(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
 GIT_COMMIT=$(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 
 # Nomad deployment
-NOMAD_JOB=deployment/nomad/devicemanager.nomad
+NOMAD_JOB=deployment/nomad/rackd.nomad
 
 .PHONY: all build server cli ui ui-install ui-build ui-clean clean test docker docker-build docker-push docker-compose-up docker-compose-down nomad-run nomad-stop help
 
@@ -125,14 +125,14 @@ deps:
 ## docker-build: Build Docker image
 docker-build:
 	@echo "Building Docker image..."
-	$(DOCKER) build -t devicemanager:$(VERSION) .
-	$(DOCKER) tag devicemanager:$(VERSION) devicemanager:latest
+	$(DOCKER) build -t rackd:$(VERSION) .
+	$(DOCKER) tag rackd:$(VERSION) rackd:latest
 
 ## docker-push: Push Docker image to registry
 docker-push:
 	@echo "Pushing Docker image..."
-	$(DOCKER) push devicemanager:$(VERSION)
-	$(DOCKER) push devicemanager:latest
+	$(DOCKER) push rackd:$(VERSION)
+	$(DOCKER) push rackd:latest
 
 ## docker-compose-up: Start services with docker-compose
 docker-compose-up:
@@ -161,18 +161,18 @@ nomad-run:
 ## nomad-stop: Stop Nomad job
 nomad-stop:
 	@echo "Stopping Nomad job..."
-	nomad job stop devicemanager
+	nomad job stop rackd
 
 ## nomad-restart: Restart Nomad job
 nomad-restart:
 	@echo "Restarting Nomad job..."
-	nomad job restart devicemanager
+	nomad job restart rackd
 
 ## nomad-status: Show Nomad job status
 nomad-status:
 	@echo "Nomad job status..."
-	nomad job status devicemanager
-	nomad alloc status -job devicemanager
+	nomad job status rackd
+	nomad alloc status -job rackd
 
 ## run-server: Run server locally
 run-server:
@@ -194,7 +194,7 @@ mod-tidy:
 
 ## help: Show this help message
 help:
-	@echo "Device Manager - Available targets:"
+	@echo "Rackd - Available targets:"
 	@grep -E '^## ' $(MAKEFILE_LIST) | sed 's/## /  /'
 
 # Development targets

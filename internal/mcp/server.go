@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/martinsuchenak/devicemanager/internal/model"
-	"github.com/martinsuchenak/devicemanager/internal/storage"
+	"github.com/martinsuchenak/rackd/internal/model"
+	"github.com/martinsuchenak/rackd/internal/storage"
 	"github.com/paularlott/mcp"
 )
 
@@ -23,7 +23,7 @@ type Server struct {
 // NewServer creates a new MCP server for device management
 func NewServer(storage storage.Storage, bearerToken string) *Server {
 	s := &Server{
-		mcpServer: mcp.NewServer("devicemanager", "1.0.0"),
+		mcpServer: mcp.NewServer("rackd", "1.0.0"),
 		storage:   storage,
 		bearerToken: bearerToken,
 	}
@@ -399,7 +399,7 @@ func (s *Server) GetHTTPHandler() http.HandlerFunc {
 
 // LogStartup logs MCP server startup information
 func (s *Server) LogStartup() {
-	log.Println("MCP Server: devicemanager v1.0.0")
+	log.Println("MCP Server: rackd v1.0.0")
 	if s.bearerToken != "" {
 		log.Println("MCP authentication: Bearer token required")
 	} else {

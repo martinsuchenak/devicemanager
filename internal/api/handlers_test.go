@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/martinsuchenak/devicemanager/internal/model"
-	"github.com/martinsuchenak/devicemanager/internal/storage"
+	"github.com/martinsuchenak/rackd/internal/model"
+	"github.com/martinsuchenak/rackd/internal/storage"
 )
 
 // mockStorage is a simple in-memory storage for testing

@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/martinsuchenak/devicemanager/internal/model"
+	"github.com/martinsuchenak/rackd/internal/model"
 )
 
 // setupTestStorage creates a temporary storage instance for testing

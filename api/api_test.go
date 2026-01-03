@@ -9,8 +9,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/martinsuchenak/devicemanager/internal/api"
-	"github.com/martinsuchenak/devicemanager/internal/storage"
+	"github.com/martinsuchenak/rackd/internal/api"
+	"github.com/martinsuchenak/rackd/internal/storage"
 )
 
 // TestServer is a helper for integration tests
