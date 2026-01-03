@@ -20,8 +20,6 @@ func main() {
 	dataDir := flag.String("data-dir", "", "Data directory path")
 	listenAddr := flag.String("addr", "", "Server listen address (e.g., :8080)")
 	bearerToken := flag.String("token", "", "MCP bearer token for authentication")
-	storageBackend := flag.String("storage", "", "Storage backend: sqlite or file (default: sqlite)")
-	storageFormat := flag.String("format", "", "Storage format for file backend: json or toml (default: json)")
 	showVersion := flag.Bool("version", false, "Show version information")
 	showHelp := flag.Bool("help", false, "Show help information")
 
@@ -53,15 +51,9 @@ func main() {
 	if *bearerToken != "" {
 		cliOpts.BearerToken = *bearerToken
 	}
-	if *storageBackend != "" {
-		cliOpts.StorageBackend = *storageBackend
-	}
-	if *storageFormat != "" {
-		cliOpts.StorageFormat = *storageFormat
-	}
 
 	// If any CLI flag was set, use it to override all other sources
-	if *dataDir != "" || *listenAddr != "" || *bearerToken != "" || *storageBackend != "" || *storageFormat != "" {
+	if *dataDir != "" || *listenAddr != "" || *bearerToken != "" {
 		cfg = config.Load(cliOpts)
 	} else {
 		// No CLI flags, load from .env file or ENV vars
@@ -71,12 +63,12 @@ func main() {
 	// Log config source
 	log.Printf("Configuration loaded from: %s", cfg)
 
-	// Initialize storage
-	store, err := storage.NewStorage(cfg.DataDir, cfg.StorageBackend, cfg.StorageFormat)
+	// Initialize storage (SQLite only)
+	store, err := storage.NewStorage(cfg.DataDir, "", "")
 	if err != nil {
 		log.Fatalf("Failed to initialize storage: %v", err)
 	}
-	log.Printf("Storage initialized: %s (%s backend)", cfg.DataDir, cfg.StorageBackend)
+	log.Printf("Storage initialized: %s (SQLite backend)", cfg.DataDir)
 
 	// Create API handler
 	apiHandler := api.NewHandler(store)
@@ -98,7 +90,7 @@ func main() {
 
 	// Start server
 	server := &http.Server{
-		Addr: cfg.ListenAddr,
+		Addr:    cfg.ListenAddr,
 		Handler: mux,
 	}
 

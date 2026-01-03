@@ -9,12 +9,10 @@ import (
 
 // Config holds the application configuration
 type Config struct {
-	DataDir        string
-	ListenAddr     string
-	BearerToken    string
-	StorageBackend string // "file" or "sqlite" (default: "sqlite")
-	StorageFormat  string // "json" or "toml" (only for file backend)
-	ConfigFile     string // Path to .env file (if loaded)
+	DataDir     string
+	ListenAddr  string
+	BearerToken string
+	ConfigFile  string // Path to .env file (if loaded)
 }
 
 // Load loads configuration with the following priority (highest to lowest):
@@ -27,11 +25,9 @@ type Config struct {
 // Otherwise, .env file overrides environment variables.
 func Load(opts *Config) *Config {
 	cfg := &Config{
-		DataDir:        "./data",
-		ListenAddr:     ":8080",
-		BearerToken:    "",
-		StorageBackend: "sqlite",
-		StorageFormat:  "json",
+		DataDir:     "./data",
+		ListenAddr:  ":8080",
+		BearerToken: "",
 	}
 
 	// First, try to load from .env file
@@ -49,8 +45,6 @@ func Load(opts *Config) *Config {
 	cfg.DataDir = coalesce(cfg.DataDir, os.Getenv("RACKD_DATA_DIR"), "./data")
 	cfg.ListenAddr = coalesce(cfg.ListenAddr, os.Getenv("RACKD_LISTEN_ADDR"), ":8080")
 	cfg.BearerToken = coalesce(cfg.BearerToken, os.Getenv("RACKD_BEARER_TOKEN"), "")
-	cfg.StorageBackend = coalesce(cfg.StorageBackend, os.Getenv("RACKD_STORAGE_BACKEND"), "sqlite")
-	cfg.StorageFormat = coalesce(cfg.StorageFormat, os.Getenv("RACKD_STORAGE_FORMAT"), "json")
 
 	// Finally, apply CLI opts if provided (highest priority)
 	if opts != nil {
@@ -63,22 +57,6 @@ func Load(opts *Config) *Config {
 		if opts.BearerToken != "" {
 			cfg.BearerToken = opts.BearerToken
 		}
-		if opts.StorageBackend != "" {
-			cfg.StorageBackend = opts.StorageBackend
-		}
-		if opts.StorageFormat != "" {
-			cfg.StorageFormat = opts.StorageFormat
-		}
-	}
-
-	// Validate storage backend
-	if cfg.StorageBackend != "file" && cfg.StorageBackend != "sqlite" {
-		cfg.StorageBackend = "sqlite"
-	}
-
-	// Validate storage format
-	if cfg.StorageFormat != "json" && cfg.StorageFormat != "toml" {
-		cfg.StorageFormat = "json"
 	}
 
 	return cfg
@@ -120,10 +98,6 @@ func loadFromEnvFile(cfg *Config, filename string) error {
 			cfg.ListenAddr = value
 		case "RACKD_BEARER_TOKEN":
 			cfg.BearerToken = value
-		case "RACKD_STORAGE_BACKEND":
-			cfg.StorageBackend = value
-		case "RACKD_STORAGE_FORMAT":
-			cfg.StorageFormat = value
 		}
 	}
 

@@ -4,9 +4,10 @@ A Go-based device tracking application with MCP server support, web UI, and CLI.
 
 ## Features
 
-- Track devices with detailed information (name, IP addresses, make/model, OS, location, tags, domains)
+- Track devices with detailed information (name, IP addresses, make/model, OS, datacenter, tags, domains)
+- Manage datacenters with location and description metadata
 - SQLite storage with support for device relationships
-- RESTful API for CRUD operations
+- RESTful API for CRUD operations on devices and datacenters
 - Modern web UI with dark mode support (follows OS theme)
 - CLI tool for command-line operations
 - MCP (Model Context Protocol) server for AI integration
@@ -89,29 +90,25 @@ cp .env.example .env
 # Edit with your settings
 # RACKD_DATA_DIR=./data
 # RACKD_LISTEN_ADDR=:8080
-# RACKD_STORAGE_BACKEND=sqlite
-# RACKD_STORAGE_FORMAT=json
 # RACKD_BEARER_TOKEN=
 ```
 
 ### CLI Flags
 
 ```bash
-./rackd -data-dir /custom/data -addr :9000 -storage file
+./rackd -data-dir /custom/data -addr :9000
 ```
 
 | Flag | ENV Variable | Default | Description |
 |------|--------------|---------|-------------|
-| `-data-dir` | `RACKD_DATA_DIR` | `./data` | Directory for device data/database |
+| `-data-dir` | `RACKD_DATA_DIR` | `./data` | Directory for SQLite database |
 | `-addr` | `RACKD_LISTEN_ADDR` | `:8080` | Server listen address |
-| `-storage` | `RACKD_STORAGE_BACKEND` | `sqlite` | Storage backend: `sqlite` or `file` |
-| `-format` | `RACKD_STORAGE_FORMAT` | `json` | Storage format for file backend: `json` or `toml` |
 | `-token` | `RACKD_BEARER_TOKEN` | (none) | MCP authentication token |
 
 ### Configuration Examples
 
 ```bash
-# Use defaults (sqlite storage, :8080, ./data)
+# Use defaults (SQLite storage, :8080, ./data)
 ./rackd
 
 # Use .env file for configuration
@@ -127,46 +124,22 @@ export RACKD_LISTEN_ADDR=:8080
 ./rackd
 ```
 
-### Storage Backends
+### Storage
 
-#### SQLite (Default)
-
-SQLite is the recommended backend and provides:
+Rackd uses SQLite for storage with the following benefits:
 - Better performance for large datasets
 - ACID transactions
 - Device relationship support
+- Datacenter management
 - Single file database (`data/devices.db`)
 
-```bash
-# Using .env file
-echo "RACKD_STORAGE_BACKEND=sqlite" > .env
-./rackd
+The database is automatically created on first run.
 
-# Using CLI flag
-./rackd -storage sqlite
+### Datacenter Management
 
-# Using environment variable
-RACKD_STORAGE_BACKEND=sqlite ./rackd
-```
+Devices can be associated with datacenters. When upgrading from an older version, existing location values are automatically migrated to datacenter entries.
 
-#### File-Based Storage
-
-File-based storage stores each device as a separate file (JSON or TOML format).
-
-```bash
-# Using .env file
-echo "RACKD_STORAGE_BACKEND=file" >> .env
-echo "RACKD_STORAGE_FORMAT=json" >> .env
-./rackd
-
-# Using CLI flags
-./rackd -storage file -format json
-
-# Using environment variables
-RACKD_STORAGE_BACKEND=file RACKD_STORAGE_FORMAT=toml ./rackd
-```
-
-### Device Relationships (SQLite only)
+### Device Relationships
 
 SQLite storage supports relationships between devices:
 
@@ -200,7 +173,7 @@ make cli
   --name "web-server-01" \
   --make-model "Dell PowerEdge R740" \
   --os "Ubuntu 22.04" \
-  --location "Rack A1" \
+  --datacenter-id "dc-123" \
   --tags "server,production,web" \
   --domains "example.com,www.example.com"
 
@@ -218,7 +191,7 @@ make cli
 
 # Update a device
 ./build/rackd-cli update web-server-01 \
-  --location "Rack B2" \
+  --datacenter-id "dc-456" \
   --tags "server,production,web,backend"
 
 # Delete a device
@@ -230,18 +203,20 @@ make cli
 
 ## REST API
 
-### List Devices
+### Devices
+
+#### List Devices
 ```bash
 GET /api/devices
 GET /api/devices?tag=server&tag=production
 ```
 
-### Get Device
+#### Get Device
 ```bash
 GET /api/devices/{id}
 ```
 
-### Create Device
+#### Create Device
 ```bash
 POST /api/devices
 Content-Type: application/json
@@ -251,7 +226,7 @@ Content-Type: application/json
   "description": "Main web server",
   "make_model": "Dell PowerEdge R740",
   "os": "Ubuntu 22.04",
-  "location": "Rack A1",
+  "datacenter_id": "dc-123",
   "tags": ["server", "production", "web"],
   "domains": ["example.com"],
   "addresses": [
@@ -265,25 +240,73 @@ Content-Type: application/json
 }
 ```
 
-### Update Device
+#### Update Device
 ```bash
 PUT /api/devices/{id}
 Content-Type: application/json
 
 {
   "name": "web-server-01",
-  "location": "Rack B2"
+  "datacenter_id": "dc-456"
 }
 ```
 
-### Delete Device
+#### Delete Device
 ```bash
 DELETE /api/devices/{id}
 ```
 
-### Search Devices
+#### Search Devices
 ```bash
 GET /api/search?q=dell
+```
+
+### Datacenters
+
+#### List Datacenters
+```bash
+GET /api/datacenters
+```
+
+#### Get Datacenter
+```bash
+GET /api/datacenters/{id}
+```
+
+#### Create Datacenter
+```bash
+POST /api/datacenters
+Content-Type: application/json
+
+{
+  "name": "US-West-1",
+  "location": "San Francisco, CA",
+  "description": "Primary US West Coast datacenter"
+}
+```
+
+#### Update Datacenter
+```bash
+PUT /api/datacenters/{id}
+Content-Type: application/json
+
+{
+  "name": "US-West-1",
+  "location": "San Francisco, CA",
+  "description": "Updated description"
+}
+```
+
+#### Delete Datacenter
+```bash
+DELETE /api/datacenters/{id}
+```
+
+Note: Deleting a datacenter will remove the datacenter reference from all devices (devices are not deleted).
+
+#### Get Datacenter Devices
+```bash
+GET /api/datacenters/{id}/devices
 ```
 
 ### Relationships (SQLite only)
@@ -382,12 +405,21 @@ type Device struct {
     Description string       `json:"description"`
     MakeModel   string       `json:"make_model"`
     OS          string       `json:"os"`
-    Location    string       `json:"location"`
+    DatacenterID string      `json:"datacenter_id"`
     Tags        []string     `json:"tags"`
     Addresses   []Address    `json:"addresses"`
     Domains     []string     `json:"domains"`
     CreatedAt   time.Time    `json:"created_at"`
     UpdatedAt   time.Time    `json:"updated_at"`
+}
+
+type Datacenter struct {
+    ID          string    `json:"id"`
+    Name        string    `json:"name"`
+    Location    string    `json:"location"`
+    Description string    `json:"description"`
+    CreatedAt   time.Time `json:"created_at"`
+    UpdatedAt   time.Time `json:"updated_at"`
 }
 
 type Address struct {
@@ -468,18 +500,6 @@ make clean          # Remove all build artifacts
 make test           # Run tests
 make docker-build   # Build Docker image
 ```
-
-### Migration from File Storage to SQLite
-
-If you have existing file-based storage, you can migrate to SQLite:
-
-```go
-// In your code or via a future CLI command
-sqliteStore, _ := storage.NewSQLiteStorage(dataDir)
-err := sqliteStore.MigrateFromFileStorage(dataDir, "json")
-```
-
-This will import all devices from JSON/TOML files into the SQLite database.
 
 ## License
 

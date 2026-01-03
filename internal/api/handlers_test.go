@@ -3,6 +3,7 @@ package api
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -111,12 +112,30 @@ func TestHandler_ListDevices(t *testing.T) {
 func TestHandler_CreateDevice(t *testing.T) {
 	handler := setupTestHandler()
 
-	deviceJSON := `{
+	// First create a datacenter
+	datacenterJSON := `{
+		"name": "Test DC",
+		"location": "San Francisco",
+		"description": "A test datacenter"
+	}`
+
+	req := httptest.NewRequest("POST", "/api/datacenters", bytes.NewReader([]byte(datacenterJSON)))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	handler.createDatacenter(w, req)
+
+	var datacenter model.Datacenter
+	if err := json.NewDecoder(w.Result().Body).Decode(&datacenter); err != nil {
+		t.Fatalf("Failed to decode datacenter response: %v", err)
+	}
+
+	// Now create a device with the datacenter
+	deviceJSON := fmt.Sprintf(`{
 		"name": "Test Server",
 		"description": "A test server",
 		"make_model": "Dell R740",
 		"os": "Ubuntu 22.04",
-		"location": "Rack A1",
+		"datacenter_id": "%s",
 		"tags": ["server", "test"],
 		"domains": ["example.com"],
 		"addresses": [
@@ -127,11 +146,11 @@ func TestHandler_CreateDevice(t *testing.T) {
 				"label": "management"
 			}
 		]
-	}`
+	}`, datacenter.ID)
 
-	req := httptest.NewRequest("POST", "/api/devices", bytes.NewReader([]byte(deviceJSON)))
+	req = httptest.NewRequest("POST", "/api/devices", bytes.NewReader([]byte(deviceJSON)))
 	req.Header.Set("Content-Type", "application/json")
-	w := httptest.NewRecorder()
+	w = httptest.NewRecorder()
 
 	handler.createDevice(w, req)
 
@@ -282,7 +301,6 @@ func TestHandler_UpdateDevice(t *testing.T) {
 	// Update it
 	updateJSON := `{
 		"name": "Updated Name",
-		"location": "Rack B2",
 		"tags": ["updated"]
 	}`
 
@@ -452,8 +470,7 @@ func TestHandler_Integration_CreateGetUpdateDelete(t *testing.T) {
 	// Create
 	deviceJSON := `{
 		"name": "Integration Test Device",
-		"description": "Testing full lifecycle",
-		"location": "Test Rack"
+		"description": "Testing full lifecycle"
 	}`
 
 	createReq := httptest.NewRequest("POST", "/api/devices", bytes.NewReader([]byte(deviceJSON)))
@@ -485,7 +502,7 @@ func TestHandler_Integration_CreateGetUpdateDelete(t *testing.T) {
 	}
 
 	// Update
-	updateJSON := `{"location": "Updated Rack"}`
+	updateJSON := `{"name": "Updated Integration Device"}`
 	updateReq := httptest.NewRequest("PUT", "/api/devices/"+created.ID, bytes.NewReader([]byte(updateJSON)))
 	updateReq.SetPathValue("id", created.ID)
 	updateReq.Header.Set("Content-Type", "application/json")

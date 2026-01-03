@@ -29,7 +29,7 @@ func main() {
 
 	// Try to initialize local storage for offline use
 	var err error
-	store, err = storage.NewFileStorage(cfg.DataDir, cfg.StorageFormat)
+	store, err = storage.NewStorage(cfg.DataDir, "", "")
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Warning: Could not initialize local storage: %v\n", err)
 	}
@@ -79,19 +79,19 @@ func addCommand() *cli.Command {
 			&cli.StringFlag{Name: "description", Usage: "Device description"},
 			&cli.StringFlag{Name: "make-model", Usage: "Make and model"},
 			&cli.StringFlag{Name: "os", Usage: "Operating system"},
-			&cli.StringFlag{Name: "location", Usage: "Physical location"},
+			&cli.StringFlag{Name: "datacenter-id", Usage: "Datacenter ID"},
 			&cli.StringFlag{Name: "tags", Usage: "Comma-separated tags"},
 			&cli.StringFlag{Name: "domains", Usage: "Comma-separated domains"},
 		},
 		Run: func(ctx context.Context, cmd *cli.Command) error {
 			device := &model.Device{
-				Name:        cmd.GetString("name"),
-				Description: cmd.GetString("description"),
-				MakeModel:   cmd.GetString("make-model"),
-				OS:          cmd.GetString("os"),
-				Location:    cmd.GetString("location"),
-				Tags:        parseTags(cmd.GetString("tags")),
-				Domains:     parseList(cmd.GetString("domains")),
+				Name:         cmd.GetString("name"),
+				Description:  cmd.GetString("description"),
+				MakeModel:    cmd.GetString("make-model"),
+				OS:           cmd.GetString("os"),
+				DatacenterID: cmd.GetString("datacenter-id"),
+				Tags:         parseTags(cmd.GetString("tags")),
+				Domains:      parseList(cmd.GetString("domains")),
 			}
 
 			if cmd.GetBool("local") || store != nil {
@@ -150,20 +150,20 @@ func updateCommand() *cli.Command {
 			&cli.StringFlag{Name: "description", Usage: "Device description"},
 			&cli.StringFlag{Name: "make-model", Usage: "Make and model"},
 			&cli.StringFlag{Name: "os", Usage: "Operating system"},
-			&cli.StringFlag{Name: "location", Usage: "Physical location"},
+			&cli.StringFlag{Name: "datacenter-id", Usage: "Datacenter ID"},
 			&cli.StringFlag{Name: "tags", Usage: "Comma-separated tags"},
 			&cli.StringFlag{Name: "domains", Usage: "Comma-separated domains"},
 		},
 		Run: func(ctx context.Context, cmd *cli.Command) error {
 			id := cmd.GetStringArg("id")
 			device := &model.Device{
-				Name:        cmd.GetString("name"),
-				Description: cmd.GetString("description"),
-				MakeModel:   cmd.GetString("make-model"),
-				OS:          cmd.GetString("os"),
-				Location:    cmd.GetString("location"),
-				Tags:        parseTags(cmd.GetString("tags")),
-				Domains:     parseList(cmd.GetString("domains")),
+				Name:         cmd.GetString("name"),
+				Description:  cmd.GetString("description"),
+				MakeModel:    cmd.GetString("make-model"),
+				OS:           cmd.GetString("os"),
+				DatacenterID: cmd.GetString("datacenter-id"),
+				Tags:         parseTags(cmd.GetString("tags")),
+				Domains:      parseList(cmd.GetString("domains")),
 			}
 
 			if cmd.GetBool("local") || store != nil {
@@ -256,8 +256,8 @@ func updateLocal(id string, updates *model.Device) error {
 	if updates.OS != "" {
 		device.OS = updates.OS
 	}
-	if updates.Location != "" {
-		device.Location = updates.Location
+	if updates.DatacenterID != "" {
+		device.DatacenterID = updates.DatacenterID
 	}
 	if updates.Tags != nil {
 		device.Tags = updates.Tags
@@ -461,19 +461,19 @@ func printDevices(devices []model.Device) {
 	}
 
 	for _, d := range devices {
-		fmt.Printf("%s\t%s\t%s\n", d.ID, d.Name, d.Location)
+		fmt.Printf("%s\t%s\t%s\n", d.ID, d.Name, d.DatacenterID)
 	}
 }
 
 func printDevice(device *model.Device) {
-	fmt.Printf("ID:          %s\n", device.ID)
-	fmt.Printf("Name:        %s\n", device.Name)
-	fmt.Printf("Description: %s\n", device.Description)
-	fmt.Printf("Make/Model:  %s\n", device.MakeModel)
-	fmt.Printf("OS:          %s\n", device.OS)
-	fmt.Printf("Location:    %s\n", device.Location)
-	fmt.Printf("Tags:        %s\n", strings.Join(device.Tags, ", "))
-	fmt.Printf("Domains:     %s\n", strings.Join(device.Domains, ", "))
+	fmt.Printf("ID:           %s\n", device.ID)
+	fmt.Printf("Name:         %s\n", device.Name)
+	fmt.Printf("Description:  %s\n", device.Description)
+	fmt.Printf("Make/Model:   %s\n", device.MakeModel)
+	fmt.Printf("OS:           %s\n", device.OS)
+	fmt.Printf("Datacenter:   %s\n", device.DatacenterID)
+	fmt.Printf("Tags:         %s\n", strings.Join(device.Tags, ", "))
+	fmt.Printf("Domains:      %s\n", strings.Join(device.Domains, ", "))
 	fmt.Println("Addresses:")
 	for _, a := range device.Addresses {
 		fmt.Printf("  - %s:%d (%s) [%s]\n", a.IP, a.Port, a.Label, a.Type)

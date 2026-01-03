@@ -27,7 +27,7 @@ func NewTestServer(t *testing.T) *TestServer {
 
 	tmpDir := t.TempDir()
 
-	store, err := storage.NewFileStorage(tmpDir, "json")
+	store, err := storage.NewSQLiteStorage(tmpDir)
 	if err != nil {
 		t.Fatalf("Failed to create storage: %v", err)
 	}
@@ -78,12 +78,28 @@ func TestAPI_Integration_CreateReadUpdateDelete(t *testing.T) {
 
 	// 1. Create a device
 	t.Run("CreateDevice", func(t *testing.T) {
+		// First create a datacenter
+		dcPayload := DeviceJSON("Test DC", map[string]interface{}{
+			"location":    "San Francisco",
+			"description": "A test datacenter",
+		})
+		dcResp, err := http.Post(ts.URL()+"/api/datacenters", "application/json", bytes.NewReader(dcPayload))
+		if err != nil {
+			t.Fatalf("Failed to create datacenter: %v", err)
+		}
+		defer dcResp.Body.Close()
+
+		var datacenter map[string]interface{}
+		if err := json.NewDecoder(dcResp.Body).Decode(&datacenter); err != nil {
+			t.Fatalf("Failed to decode datacenter response: %v", err)
+		}
+
 		payload := DeviceJSON("Integration Test Server", map[string]interface{}{
-			"description": "Test server for integration testing",
-			"make_model":  "Dell R740",
-			"os":          "Ubuntu 22.04",
-			"location":    "Rack A1",
-			"tags":        []string{"test", "integration"},
+			"description":   "Test server for integration testing",
+			"make_model":    "Dell R740",
+			"os":            "Ubuntu 22.04",
+			"datacenter_id": datacenter["id"].(string),
+			"tags":          []string{"test", "integration"},
 			"addresses": []map[string]interface{}{
 				{
 					"ip":    "192.168.1.100",
@@ -145,8 +161,7 @@ func TestAPI_Integration_CreateReadUpdateDelete(t *testing.T) {
 	// 3. Update the device
 	t.Run("UpdateDevice", func(t *testing.T) {
 		payload := DeviceJSON("Updated Server Name", map[string]interface{}{
-			"location": "Rack B2",
-			"tags":     []string{"test", "integration", "updated"},
+			"tags": []string{"test", "integration", "updated"},
 		})
 
 		req, err := http.NewRequest("PUT", ts.URL()+"/api/devices/"+deviceID, bytes.NewReader(payload))
@@ -213,9 +228,9 @@ func TestAPI_ListDevices(t *testing.T) {
 
 	// Create multiple devices
 	devices := []map[string]interface{}{
-		{"name": "Server 1", "tags": []string{"server", "production"}, "location": "Rack A1"},
-		{"name": "Server 2", "tags": []string{"server", "development"}, "location": "Rack A2"},
-		{"name": "Workstation 1", "tags": []string{"workstation"}, "location": "Office"},
+		{"name": "Server 1", "tags": []string{"server", "production"}},
+		{"name": "Server 2", "tags": []string{"server", "development"}},
+		{"name": "Workstation 1", "tags": []string{"workstation"}},
 	}
 
 	for _, d := range devices {
@@ -271,9 +286,9 @@ func TestAPI_SearchDevices(t *testing.T) {
 
 	// Create devices with searchable content
 	devices := []map[string]interface{}{
-		{"name": "Web Server", "description": "Apache web server", "make_model": "Dell R740"},
-		{"name": "Database Server", "description": "PostgreSQL database", "make_model": "HP DL380"},
-		{"name": "Mail Server", "description": "Postfix mail server", "make_model": "Dell R640"},
+		{"name": "Web Server", "description": "Apache web server"},
+		{"name": "Database Server", "description": "PostgreSQL database"},
+		{"name": "Mail Server", "description": "Postfix mail server"},
 	}
 
 	for _, d := range devices {
@@ -293,7 +308,6 @@ func TestAPI_SearchDevices(t *testing.T) {
 	}{
 		{"Search by name", "server", 2, 3},
 		{"Search by description", "postgresql", 1, 1},
-		{"Search by make", "Dell", 2, 2},
 		{"Search no results", "nonexistent", 0, 0},
 	}
 

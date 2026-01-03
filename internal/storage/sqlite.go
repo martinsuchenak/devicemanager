@@ -76,15 +76,42 @@ func NewSQLiteStorage(dataDir string) (*SQLiteStorage, error) {
 	return ss, nil
 }
 
-// initSchema creates the database schema
+// initSchema creates the database schema and runs migrations
 func (ss *SQLiteStorage) initSchema() error {
-	schema, err := schemaFS.ReadFile("schema.sql")
-	if err != nil {
-		return fmt.Errorf("reading schema: %w", err)
+	// Check if database is already initialized by checking for schema_migrations table
+	var tableName string
+	err := ss.db.QueryRow("SELECT name FROM sqlite_master WHERE type='table' AND name='schema_migrations'").Scan(&tableName)
+	if err == sql.ErrNoRows {
+		// Database is new, run schema.sql
+		schema, err := schemaFS.ReadFile("schema.sql")
+		if err != nil {
+			return fmt.Errorf("reading schema: %w", err)
+		}
+
+		_, err = ss.db.Exec(string(schema))
+		if err != nil {
+			return fmt.Errorf("executing schema.sql: %w", err)
+		}
 	}
 
-	_, err = ss.db.Exec(string(schema))
-	return err
+	// Run migrations if needed
+	if err := ss.MigrateToV2(); err != nil {
+		return fmt.Errorf("running MigrateToV2: %w", err)
+	}
+
+	if err := ss.MigrateToV3(); err != nil {
+		return fmt.Errorf("running MigrateToV3: %w", err)
+	}
+
+	if err := ss.MigrateToV4(); err != nil {
+		return fmt.Errorf("running MigrateToV4: %w", err)
+	}
+
+	if err := ss.MigrateToV5(); err != nil {
+		return fmt.Errorf("running MigrateToV5: %w", err)
+	}
+
+	return nil
 }
 
 // Close closes the database connection
@@ -98,7 +125,7 @@ func (ss *SQLiteStorage) ListDevices(filter *model.DeviceFilter) ([]model.Device
 	defer ss.mu.RUnlock()
 
 	query := `
-		SELECT d.id, d.name, d.description, d.make_model, d.os, d.location,
+		SELECT d.id, d.name, d.description, d.make_model, d.os, d.datacenter_id, d.username,
 		       d.created_at, d.updated_at
 		FROM devices d
 		ORDER BY d.name
@@ -137,7 +164,7 @@ func (ss *SQLiteStorage) GetDevice(id string) (*model.Device, error) {
 
 	// Try ID lookup first
 	query := `
-		SELECT d.id, d.name, d.description, d.make_model, d.os, d.location,
+		SELECT d.id, d.name, d.description, d.make_model, d.os, d.datacenter_id, d.username,
 		       d.created_at, d.updated_at
 		FROM devices d
 		WHERE d.id = ?
@@ -154,7 +181,7 @@ func (ss *SQLiteStorage) GetDevice(id string) (*model.Device, error) {
 
 	// Try name lookup
 	query = `
-		SELECT d.id, d.name, d.description, d.make_model, d.os, d.location,
+		SELECT d.id, d.name, d.description, d.make_model, d.os, d.datacenter_id, d.username,
 		       d.created_at, d.updated_at
 		FROM devices d
 		WHERE LOWER(d.name) = LOWER(?)
@@ -191,11 +218,25 @@ func (ss *SQLiteStorage) CreateDevice(device *model.Device) error {
 	}
 	defer tx.Rollback()
 
-	// Insert device
+	// Insert device (convert empty string to nil for NULL in SQL)
+	var datacenterIDValue interface{}
+	if device.DatacenterID == "" {
+		datacenterIDValue = nil
+	} else {
+		datacenterIDValue = device.DatacenterID
+	}
+
+	var usernameValue interface{}
+	if device.Username == "" {
+		usernameValue = nil
+	} else {
+		usernameValue = device.Username
+	}
+
 	_, err = tx.Exec(`
-		INSERT INTO devices (id, name, description, make_model, os, location, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-	`, device.ID, device.Name, device.Description, device.MakeModel, device.OS, device.Location,
+		INSERT INTO devices (id, name, description, make_model, os, datacenter_id, username, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`, device.ID, device.Name, device.Description, device.MakeModel, device.OS, datacenterIDValue, usernameValue,
 		device.CreatedAt, device.UpdatedAt)
 	if err != nil {
 		return fmt.Errorf("inserting device: %w", err)
@@ -232,12 +273,26 @@ func (ss *SQLiteStorage) UpdateDevice(device *model.Device) error {
 	}
 	defer tx.Rollback()
 
-	// Update device
+	// Update device (convert empty string to nil for NULL in SQL)
+	var datacenterIDValue interface{}
+	if device.DatacenterID == "" {
+		datacenterIDValue = nil
+	} else {
+		datacenterIDValue = device.DatacenterID
+	}
+
+	var usernameValue interface{}
+	if device.Username == "" {
+		usernameValue = nil
+	} else {
+		usernameValue = device.Username
+	}
+
 	result, err := tx.Exec(`
 		UPDATE devices
-		SET name = ?, description = ?, make_model = ?, os = ?, location = ?, updated_at = ?
+		SET name = ?, description = ?, make_model = ?, os = ?, datacenter_id = ?, username = ?, updated_at = ?
 		WHERE id = ?
-	`, device.Name, device.Description, device.MakeModel, device.OS, device.Location,
+	`, device.Name, device.Description, device.MakeModel, device.OS, datacenterIDValue, usernameValue,
 		device.UpdatedAt, device.ID)
 	if err != nil {
 		return fmt.Errorf("updating device: %w", err)
@@ -306,11 +361,11 @@ func (ss *SQLiteStorage) SearchDevices(query string) ([]model.Device, error) {
 
 	// Search in device fields
 	sqlQuery := `
-		SELECT DISTINCT d.id, d.name, d.description, d.make_model, d.os, d.location,
+		SELECT DISTINCT d.id, d.name, d.description, d.make_model, d.os, d.datacenter_id, d.network_id,
 		       d.created_at, d.updated_at
 		FROM devices d
 		WHERE LOWER(d.name) LIKE ? OR LOWER(d.description) LIKE ?
-		   OR LOWER(d.make_model) LIKE ? OR LOWER(d.os) LIKE ? OR LOWER(d.location) LIKE ?
+		   OR LOWER(d.make_model) LIKE ? OR LOWER(d.os) LIKE ? OR LOWER(d.datacenter_id) LIKE ?
 		ORDER BY d.name
 	`
 
@@ -328,7 +383,7 @@ func (ss *SQLiteStorage) SearchDevices(query string) ([]model.Device, error) {
 
 	// Search in tags
 	tagRows, err := ss.db.Query(`
-		SELECT DISTINCT d.id, d.name, d.description, d.make_model, d.os, d.location,
+		SELECT DISTINCT d.id, d.name, d.description, d.make_model, d.os, d.datacenter_id, d.network_id,
 		       d.created_at, d.updated_at
 		FROM devices d
 		INNER JOIN tags t ON d.id = t.device_id
@@ -345,7 +400,7 @@ func (ss *SQLiteStorage) SearchDevices(query string) ([]model.Device, error) {
 
 	// Search in domains
 	domainRows, err := ss.db.Query(`
-		SELECT DISTINCT d.id, d.name, d.description, d.make_model, d.os, d.location,
+		SELECT DISTINCT d.id, d.name, d.description, d.make_model, d.os, d.datacenter_id, d.network_id,
 		       d.created_at, d.updated_at
 		FROM devices d
 		INNER JOIN domains dm ON d.id = dm.device_id
@@ -362,7 +417,7 @@ func (ss *SQLiteStorage) SearchDevices(query string) ([]model.Device, error) {
 
 	// Search in addresses
 	addrRows, err := ss.db.Query(`
-		SELECT DISTINCT d.id, d.name, d.description, d.make_model, d.os, d.location,
+		SELECT DISTINCT d.id, d.name, d.description, d.make_model, d.os, d.datacenter_id, d.network_id,
 		       d.created_at, d.updated_at
 		FROM devices d
 		INNER JOIN addresses a ON d.id = a.device_id
@@ -464,7 +519,7 @@ func (ss *SQLiteStorage) GetRelatedDevices(deviceID string, relationshipType str
 	defer ss.mu.RUnlock()
 
 	query := `
-		SELECT DISTINCT d.id, d.name, d.description, d.make_model, d.os, d.location,
+		SELECT DISTINCT d.id, d.name, d.description, d.make_model, d.os, d.datacenter_id, d.network_id,
 		       d.created_at, d.updated_at
 		FROM devices d
 		INNER JOIN device_relationships dr ON (d.id = dr.parent_id OR d.id = dr.child_id)
@@ -504,16 +559,10 @@ func (ss *SQLiteStorage) MigrateFromFileStorage(dataDir, format string) error {
 	ss.mu.Lock()
 	defer ss.mu.Unlock()
 
-	// Try to load file-based storage
-	fileStorage, err := NewFileStorage(dataDir, format)
+	// Load devices from file-based storage using the standalone migration function
+	devices, err := MigrateFromFileStorage(dataDir, format)
 	if err != nil {
-		return fmt.Errorf("opening file storage: %w", err)
-	}
-
-	// Get all devices from file storage
-	devices, err := fileStorage.ListDevices(nil)
-	if err != nil {
-		return fmt.Errorf("listing devices: %w", err)
+		return fmt.Errorf("loading devices from file storage: %w", err)
 	}
 
 	// Import devices into SQLite
@@ -531,9 +580,9 @@ func (ss *SQLiteStorage) MigrateFromFileStorage(dataDir, format string) error {
 
 		// Insert device
 		_, err = ss.db.Exec(`
-			INSERT INTO devices (id, name, description, make_model, os, location, created_at, updated_at)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-		`, device.ID, device.Name, device.Description, device.MakeModel, device.OS, device.Location,
+			INSERT INTO devices (id, name, description, make_model, os, datacenter_id, username, created_at, updated_at)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+		`, device.ID, device.Name, device.Description, device.MakeModel, device.OS, device.DatacenterID, device.Username,
 			device.CreatedAt, device.UpdatedAt)
 		if err != nil {
 			return fmt.Errorf("inserting device %s: %w", device.ID, err)
@@ -584,14 +633,26 @@ func (ss *SQLiteStorage) queryDevice(query string, args ...interface{}) (*model.
 }
 
 func (ss *SQLiteStorage) scanDevices(rows *sql.Rows) ([]model.Device, error) {
-	var devices []model.Device
+	devices := []model.Device{}
 
 	for rows.Next() {
 		var d model.Device
-		err := rows.Scan(&d.ID, &d.Name, &d.Description, &d.MakeModel, &d.OS, &d.Location,
+		var datacenterID sql.NullString
+		var username sql.NullString
+		err := rows.Scan(&d.ID, &d.Name, &d.Description, &d.MakeModel, &d.OS, &datacenterID, &username,
 			&d.CreatedAt, &d.UpdatedAt)
 		if err != nil {
 			return nil, fmt.Errorf("scanning device: %w", err)
+		}
+		if datacenterID.Valid {
+			d.DatacenterID = datacenterID.String
+		} else {
+			d.DatacenterID = ""
+		}
+		if username.Valid {
+			d.Username = username.String
+		} else {
+			d.Username = ""
 		}
 		devices = append(devices, d)
 	}
@@ -634,7 +695,7 @@ func (ss *SQLiteStorage) loadBatchRelations(devices []model.Device) error {
 	}
 
 	// Load Addresses
-	addrQuery := fmt.Sprintf("SELECT device_id, ip, port, type, label FROM addresses WHERE device_id IN (%s) ORDER BY ip", placeholders)
+	addrQuery := fmt.Sprintf("SELECT device_id, ip, port, type, label, network_id, switch_port FROM addresses WHERE device_id IN (%s) ORDER BY ip", placeholders)
 	rows, err = ss.db.Query(addrQuery, ids...)
 	if err != nil {
 		return fmt.Errorf("querying batch addresses: %w", err)
@@ -644,8 +705,16 @@ func (ss *SQLiteStorage) loadBatchRelations(devices []model.Device) error {
 	for rows.Next() {
 		var deviceID string
 		var a model.Address
-		if err := rows.Scan(&deviceID, &a.IP, &a.Port, &a.Type, &a.Label); err != nil {
+		var networkID sql.NullString
+		var switchPort sql.NullString
+		if err := rows.Scan(&deviceID, &a.IP, &a.Port, &a.Type, &a.Label, &networkID, &switchPort); err != nil {
 			return err
+		}
+		if networkID.Valid {
+			a.NetworkID = networkID.String
+		}
+		if switchPort.Valid {
+			a.SwitchPort = switchPort.String
 		}
 		if d, ok := deviceMap[deviceID]; ok {
 			d.Addresses = append(d.Addresses, a)
@@ -707,7 +776,7 @@ func (ss *SQLiteStorage) loadDeviceTags(device *model.Device) error {
 }
 
 func (ss *SQLiteStorage) loadDeviceAddresses(device *model.Device) error {
-	rows, err := ss.db.Query("SELECT ip, port, type, label FROM addresses WHERE device_id = ? ORDER BY ip", device.ID)
+	rows, err := ss.db.Query("SELECT ip, port, type, label, network_id, switch_port FROM addresses WHERE device_id = ? ORDER BY ip", device.ID)
 	if err != nil {
 		return fmt.Errorf("querying addresses: %w", err)
 	}
@@ -716,8 +785,16 @@ func (ss *SQLiteStorage) loadDeviceAddresses(device *model.Device) error {
 	var addresses []model.Address
 	for rows.Next() {
 		var a model.Address
-		if err := rows.Scan(&a.IP, &a.Port, &a.Type, &a.Label); err != nil {
+		var networkID sql.NullString
+		var switchPort sql.NullString
+		if err := rows.Scan(&a.IP, &a.Port, &a.Type, &a.Label, &networkID, &switchPort); err != nil {
 			return err
+		}
+		if networkID.Valid {
+			a.NetworkID = networkID.String
+		}
+		if switchPort.Valid {
+			a.SwitchPort = switchPort.String
 		}
 		addresses = append(addresses, a)
 	}
@@ -749,14 +826,28 @@ func (ss *SQLiteStorage) loadDeviceDomains(device *model.Device) error {
 func (ss *SQLiteStorage) insertDeviceAddresses(tx *sql.Tx, deviceID string, addresses []model.Address) error {
 	for _, addr := range addresses {
 		query := `
-			INSERT INTO addresses (device_id, ip, port, type, label)
-			VALUES (?, ?, ?, ?, ?)
+			INSERT INTO addresses (device_id, ip, port, type, label, network_id, switch_port)
+			VALUES (?, ?, ?, ?, ?, ?, ?)
 		`
 		var err error
-		if tx != nil {
-			_, err = tx.Exec(query, deviceID, addr.IP, addr.Port, addr.Type, addr.Label)
+		// Convert empty string to nil for NULL in SQL
+		var networkIDValue interface{}
+		if addr.NetworkID == "" {
+			networkIDValue = nil
 		} else {
-			_, err = ss.db.Exec(query, deviceID, addr.IP, addr.Port, addr.Type, addr.Label)
+			networkIDValue = addr.NetworkID
+		}
+		var switchPortValue interface{}
+		if addr.SwitchPort == "" {
+			switchPortValue = nil
+		} else {
+			switchPortValue = addr.SwitchPort
+		}
+
+		if tx != nil {
+			_, err = tx.Exec(query, deviceID, addr.IP, addr.Port, addr.Type, addr.Label, networkIDValue, switchPortValue)
+		} else {
+			_, err = ss.db.Exec(query, deviceID, addr.IP, addr.Port, addr.Type, addr.Label, networkIDValue, switchPortValue)
 		}
 		if err != nil {
 			return fmt.Errorf("inserting address: %w", err)
@@ -853,4 +944,411 @@ func (ss *SQLiteStorage) ExportToFile(filePath string) error {
 // GetDatabasePath returns the database file path
 func (ss *SQLiteStorage) GetDatabasePath() string {
 	return ss.path
+}
+
+// Datacenter CRUD operations
+
+// ListDatacenters returns all datacenters
+func (ss *SQLiteStorage) ListDatacenters(filter *model.DatacenterFilter) ([]model.Datacenter, error) {
+	ss.mu.RLock()
+	defer ss.mu.RUnlock()
+
+	query := `SELECT id, name, location, description, created_at, updated_at FROM datacenters`
+
+	var args []interface{}
+	if filter != nil && filter.Name != "" {
+		query += " WHERE LOWER(name) LIKE ?"
+		args = append(args, "%"+strings.ToLower(filter.Name)+"%")
+	}
+
+	query += " ORDER BY name"
+
+	rows, err := ss.db.Query(query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("querying datacenters: %w", err)
+	}
+	defer rows.Close()
+
+	datacenters := []model.Datacenter{}
+	for rows.Next() {
+		var dc model.Datacenter
+		err := rows.Scan(&dc.ID, &dc.Name, &dc.Location, &dc.Description, &dc.CreatedAt, &dc.UpdatedAt)
+		if err != nil {
+			return nil, fmt.Errorf("scanning datacenter: %w", err)
+		}
+		datacenters = append(datacenters, dc)
+	}
+
+	return datacenters, rows.Err()
+}
+
+// GetDatacenter retrieves a datacenter by ID or name
+func (ss *SQLiteStorage) GetDatacenter(id string) (*model.Datacenter, error) {
+	ss.mu.RLock()
+	defer ss.mu.RUnlock()
+
+	// Try ID lookup first
+	query := `
+		SELECT id, name, location, description, created_at, updated_at
+		FROM datacenters
+		WHERE id = ?
+		LIMIT 1
+	`
+
+	dc, err := ss.queryDatacenter(query, id)
+	if err == nil {
+		return dc, nil
+	}
+
+	// Try name lookup
+	query = `
+		SELECT id, name, location, description, created_at, updated_at
+		FROM datacenters
+		WHERE LOWER(name) = LOWER(?)
+		LIMIT 1
+	`
+
+	dc, err = ss.queryDatacenter(query, id)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrDatacenterNotFound
+		}
+		return nil, err
+	}
+
+	return dc, nil
+}
+
+// CreateDatacenter adds a new datacenter
+func (ss *SQLiteStorage) CreateDatacenter(dc *model.Datacenter) error {
+	ss.mu.Lock()
+	defer ss.mu.Unlock()
+
+	now := time.Now()
+	dc.CreatedAt = now
+	dc.UpdatedAt = now
+
+	_, err := ss.db.Exec(`
+		INSERT INTO datacenters (id, name, location, description, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?)
+	`, dc.ID, dc.Name, dc.Location, dc.Description, dc.CreatedAt, dc.UpdatedAt)
+	if err != nil {
+		return fmt.Errorf("inserting datacenter: %w", err)
+	}
+
+	return nil
+}
+
+// UpdateDatacenter updates an existing datacenter
+func (ss *SQLiteStorage) UpdateDatacenter(dc *model.Datacenter) error {
+	ss.mu.Lock()
+	defer ss.mu.Unlock()
+
+	dc.UpdatedAt = time.Now()
+
+	result, err := ss.db.Exec(`
+		UPDATE datacenters
+		SET name = ?, location = ?, description = ?, updated_at = ?
+		WHERE id = ?
+	`, dc.Name, dc.Location, dc.Description, dc.UpdatedAt, dc.ID)
+	if err != nil {
+		return fmt.Errorf("updating datacenter: %w", err)
+	}
+
+	rows, _ := result.RowsAffected()
+	if rows == 0 {
+		return ErrDatacenterNotFound
+	}
+
+	return nil
+}
+
+// DeleteDatacenter removes a datacenter and sets device references to NULL
+func (ss *SQLiteStorage) DeleteDatacenter(id string) error {
+	ss.mu.Lock()
+	defer ss.mu.Unlock()
+
+	// First, update all devices in this datacenter to set datacenter_id to NULL
+	_, err := ss.db.Exec(`UPDATE devices SET datacenter_id = NULL WHERE datacenter_id = ?`, id)
+	if err != nil {
+		return fmt.Errorf("clearing device datacenter references: %w", err)
+	}
+
+	// Then delete the datacenter
+	result, err := ss.db.Exec(`DELETE FROM datacenters WHERE id = ?`, id)
+	if err != nil {
+		return fmt.Errorf("deleting datacenter: %w", err)
+	}
+
+	rows, _ := result.RowsAffected()
+	if rows == 0 {
+		return ErrDatacenterNotFound
+	}
+
+	return nil
+}
+
+// GetDatacenterDevices returns all devices in a datacenter
+func (ss *SQLiteStorage) GetDatacenterDevices(datacenterID string) ([]model.Device, error) {
+	ss.mu.RLock()
+	defer ss.mu.RUnlock()
+
+	query := `
+		SELECT d.id, d.name, d.description, d.make_model, d.os, d.datacenter_id, d.username,
+		       d.created_at, d.updated_at
+		FROM devices d
+		WHERE d.datacenter_id = ?
+		ORDER BY d.name
+	`
+
+	rows, err := ss.db.Query(query, datacenterID)
+	if err != nil {
+		return nil, fmt.Errorf("querying datacenter devices: %w", err)
+	}
+	defer rows.Close()
+
+	devices, err := ss.scanDevices(rows)
+	if err != nil {
+		return nil, err
+	}
+
+	// Load relations for all devices
+	if len(devices) > 0 {
+		if err := ss.loadBatchRelations(devices); err != nil {
+			return nil, err
+		}
+	}
+
+	return devices, nil
+}
+
+// Helper functions for datacenter queries
+
+func (ss *SQLiteStorage) queryDatacenter(query string, args ...interface{}) (*model.Datacenter, error) {
+	rows, err := ss.db.Query(query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("querying datacenter: %w", err)
+	}
+	defer rows.Close()
+
+	if !rows.Next() {
+		return nil, sql.ErrNoRows
+	}
+
+	var dc model.Datacenter
+	err = rows.Scan(&dc.ID, &dc.Name, &dc.Location, &dc.Description, &dc.CreatedAt, &dc.UpdatedAt)
+	if err != nil {
+		return nil, fmt.Errorf("scanning datacenter: %w", err)
+	}
+
+	return &dc, nil
+}
+
+// Network CRUD operations
+
+// ListNetworks returns all networks
+func (ss *SQLiteStorage) ListNetworks(filter *model.NetworkFilter) ([]model.Network, error) {
+	ss.mu.RLock()
+	defer ss.mu.RUnlock()
+
+	query := `SELECT id, name, subnet, datacenter_id, description, created_at, updated_at FROM networks`
+
+	var args []interface{}
+	if filter != nil {
+		conditions := []string{}
+		if filter.Name != "" {
+			conditions = append(conditions, "LOWER(name) LIKE ?")
+			args = append(args, "%"+strings.ToLower(filter.Name)+"%")
+		}
+		if filter.DatacenterID != "" {
+			conditions = append(conditions, "datacenter_id = ?")
+			args = append(args, filter.DatacenterID)
+		}
+		if len(conditions) > 0 {
+			query += " WHERE " + strings.Join(conditions, " AND ")
+		}
+	}
+
+	query += " ORDER BY name"
+
+	rows, err := ss.db.Query(query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("querying networks: %w", err)
+	}
+	defer rows.Close()
+
+	networks := []model.Network{}
+	for rows.Next() {
+		var n model.Network
+		err := rows.Scan(&n.ID, &n.Name, &n.Subnet, &n.DatacenterID, &n.Description, &n.CreatedAt, &n.UpdatedAt)
+		if err != nil {
+			return nil, fmt.Errorf("scanning network: %w", err)
+		}
+		networks = append(networks, n)
+	}
+
+	return networks, rows.Err()
+}
+
+// GetNetwork retrieves a network by ID or name
+func (ss *SQLiteStorage) GetNetwork(id string) (*model.Network, error) {
+	ss.mu.RLock()
+	defer ss.mu.RUnlock()
+
+	// Try ID lookup first
+	query := `
+		SELECT id, name, subnet, datacenter_id, description, created_at, updated_at
+		FROM networks
+		WHERE id = ?
+		LIMIT 1
+	`
+
+	network, err := ss.queryNetwork(query, id)
+	if err == nil {
+		return network, nil
+	}
+
+	// Try name lookup
+	query = `
+		SELECT id, name, subnet, datacenter_id, description, created_at, updated_at
+		FROM networks
+		WHERE LOWER(name) = LOWER(?)
+		LIMIT 1
+	`
+
+	network, err = ss.queryNetwork(query, id)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrNetworkNotFound
+		}
+		return nil, err
+	}
+
+	return network, nil
+}
+
+// CreateNetwork adds a new network
+func (ss *SQLiteStorage) CreateNetwork(network *model.Network) error {
+	ss.mu.Lock()
+	defer ss.mu.Unlock()
+
+	now := time.Now()
+	network.CreatedAt = now
+	network.UpdatedAt = now
+
+	_, err := ss.db.Exec(`
+		INSERT INTO networks (id, name, subnet, datacenter_id, description, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?)
+	`, network.ID, network.Name, network.Subnet, network.DatacenterID, network.Description,
+		network.CreatedAt, network.UpdatedAt)
+	if err != nil {
+		return fmt.Errorf("inserting network: %w", err)
+	}
+
+	return nil
+}
+
+// UpdateNetwork updates an existing network
+func (ss *SQLiteStorage) UpdateNetwork(network *model.Network) error {
+	ss.mu.Lock()
+	defer ss.mu.Unlock()
+
+	network.UpdatedAt = time.Now()
+
+	result, err := ss.db.Exec(`
+		UPDATE networks
+		SET name = ?, subnet = ?, datacenter_id = ?, description = ?, updated_at = ?
+		WHERE id = ?
+	`, network.Name, network.Subnet, network.DatacenterID, network.Description, network.UpdatedAt, network.ID)
+	if err != nil {
+		return fmt.Errorf("updating network: %w", err)
+	}
+
+	rows, _ := result.RowsAffected()
+	if rows == 0 {
+		return ErrNetworkNotFound
+	}
+
+	return nil
+}
+
+// DeleteNetwork removes a network and sets device references to NULL
+func (ss *SQLiteStorage) DeleteNetwork(id string) error {
+	ss.mu.Lock()
+	defer ss.mu.Unlock()
+
+	// First, update all devices in this network to set network_id to NULL
+	_, err := ss.db.Exec(`UPDATE devices SET network_id = NULL WHERE network_id = ?`, id)
+	if err != nil {
+		return fmt.Errorf("clearing device network references: %w", err)
+	}
+
+	// Then delete the network
+	result, err := ss.db.Exec(`DELETE FROM networks WHERE id = ?`, id)
+	if err != nil {
+		return fmt.Errorf("deleting network: %w", err)
+	}
+
+	rows, _ := result.RowsAffected()
+	if rows == 0 {
+		return ErrNetworkNotFound
+	}
+
+	return nil
+}
+
+// GetNetworkDevices returns all devices in a network
+func (ss *SQLiteStorage) GetNetworkDevices(networkID string) ([]model.Device, error) {
+	ss.mu.RLock()
+	defer ss.mu.RUnlock()
+
+	query := `
+		SELECT d.id, d.name, d.description, d.make_model, d.os, d.datacenter_id, d.username,
+		       d.created_at, d.updated_at
+		FROM devices d
+		WHERE d.network_id = ?
+		ORDER BY d.name
+	`
+
+	rows, err := ss.db.Query(query, networkID)
+	if err != nil {
+		return nil, fmt.Errorf("querying network devices: %w", err)
+	}
+	defer rows.Close()
+
+	devices, err := ss.scanDevices(rows)
+	if err != nil {
+		return nil, err
+	}
+
+	// Load relations for all devices
+	if len(devices) > 0 {
+		if err := ss.loadBatchRelations(devices); err != nil {
+			return nil, err
+		}
+	}
+
+	return devices, nil
+}
+
+// Helper functions for network queries
+
+func (ss *SQLiteStorage) queryNetwork(query string, args ...interface{}) (*model.Network, error) {
+	rows, err := ss.db.Query(query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("querying network: %w", err)
+	}
+	defer rows.Close()
+
+	if !rows.Next() {
+		return nil, sql.ErrNoRows
+	}
+
+	var n model.Network
+	err = rows.Scan(&n.ID, &n.Name, &n.Subnet, &n.DatacenterID, &n.Description, &n.CreatedAt, &n.UpdatedAt)
+	if err != nil {
+		return nil, fmt.Errorf("scanning network: %w", err)
+	}
+
+	return &n, nil
 }
