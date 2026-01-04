@@ -12,6 +12,7 @@ type Config struct {
 	DataDir     string
 	ListenAddr  string
 	BearerToken string
+	ApiToken    string
 	ConfigFile  string // Path to .env file (if loaded)
 }
 
@@ -28,6 +29,7 @@ func Load(opts *Config) *Config {
 		DataDir:     "./data",
 		ListenAddr:  ":8080",
 		BearerToken: "",
+		ApiToken:    "",
 	}
 
 	// First, try to load from .env file
@@ -45,6 +47,7 @@ func Load(opts *Config) *Config {
 	cfg.DataDir = coalesce(cfg.DataDir, os.Getenv("RACKD_DATA_DIR"), "./data")
 	cfg.ListenAddr = coalesce(cfg.ListenAddr, os.Getenv("RACKD_LISTEN_ADDR"), ":8080")
 	cfg.BearerToken = coalesce(cfg.BearerToken, os.Getenv("RACKD_BEARER_TOKEN"), "")
+	cfg.ApiToken = coalesce(cfg.ApiToken, os.Getenv("RACKD_API_TOKEN"), "")
 
 	// Finally, apply CLI opts if provided (highest priority)
 	if opts != nil {
@@ -56,6 +59,9 @@ func Load(opts *Config) *Config {
 		}
 		if opts.BearerToken != "" {
 			cfg.BearerToken = opts.BearerToken
+		}
+		if opts.ApiToken != "" {
+			cfg.ApiToken = opts.ApiToken
 		}
 	}
 
@@ -98,6 +104,8 @@ func loadFromEnvFile(cfg *Config, filename string) error {
 			cfg.ListenAddr = value
 		case "RACKD_BEARER_TOKEN":
 			cfg.BearerToken = value
+		case "RACKD_API_TOKEN":
+			cfg.ApiToken = value
 		}
 	}
 
@@ -107,6 +115,11 @@ func loadFromEnvFile(cfg *Config, filename string) error {
 // IsMCPEnabled checks if MCP authentication is configured
 func (c *Config) IsMCPEnabled() bool {
 	return c.BearerToken != ""
+}
+
+// IsAPIAuthEnabled checks if API authentication is configured
+func (c *Config) IsAPIAuthEnabled() bool {
+	return c.ApiToken != ""
 }
 
 // String returns a string representation of the config source

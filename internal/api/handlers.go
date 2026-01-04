@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"log"
+	"net"
 	"net/http"
 	"strings"
 	"time"
@@ -108,6 +109,14 @@ func (h *Handler) createDevice(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Validate IP addresses
+	for _, addr := range device.Addresses {
+		if net.ParseIP(addr.IP) == nil {
+			h.writeError(w, http.StatusBadRequest, "invalid IP address: "+addr.IP)
+			return
+		}
+	}
+
 	// Generate ID if not provided
 	if device.ID == "" {
 		device.ID = generateID(device.Name)
@@ -151,6 +160,14 @@ func (h *Handler) updateDevice(w http.ResponseWriter, r *http.Request) {
 	// Ensure ID matches URL
 	device.ID = id
 	device.UpdatedAt = time.Now()
+
+	// Validate IP addresses
+	for _, addr := range device.Addresses {
+		if net.ParseIP(addr.IP) == nil {
+			h.writeError(w, http.StatusBadRequest, "invalid IP address: "+addr.IP)
+			return
+		}
+	}
 
 	if err := h.storage.UpdateDevice(&device); err != nil {
 		if errors.Is(err, storage.ErrDeviceNotFound) {
@@ -631,6 +648,10 @@ func (h *Handler) createNetwork(w http.ResponseWriter, r *http.Request) {
 		h.writeError(w, http.StatusBadRequest, "subnet is required")
 		return
 	}
+	if _, _, err := net.ParseCIDR(network.Subnet); err != nil {
+		h.writeError(w, http.StatusBadRequest, "invalid subnet CIDR: "+network.Subnet)
+		return
+	}
 	if network.DatacenterID == "" {
 		h.writeError(w, http.StatusBadRequest, "datacenter_id is required")
 		return
@@ -679,6 +700,14 @@ func (h *Handler) updateNetwork(w http.ResponseWriter, r *http.Request) {
 
 	// Ensure ID matches URL
 	network.ID = id
+
+	// Validate subnet if provided (though it's required in model, JSON decode might leave it empty or partially filled)
+	if network.Subnet != "" {
+		if _, _, err := net.ParseCIDR(network.Subnet); err != nil {
+			h.writeError(w, http.StatusBadRequest, "invalid subnet CIDR: "+network.Subnet)
+			return
+		}
+	}
 
 	netStorage, ok := h.storage.(storage.NetworkStorage)
 	if !ok {
