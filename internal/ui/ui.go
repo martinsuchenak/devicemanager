@@ -42,7 +42,12 @@ func AssetHandler() http.HandlerFunc {
 			path = strings.TrimPrefix(path, "/assets/")
 		}
 
-		// Set cache headers for static assets
+		// Disable caching for all assets during development
+		w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
+		w.Header().Set("Pragma", "no-cache")
+		w.Header().Set("Expires", "0")
+
+		// Set content type headers
 		ext := strings.LastIndex(path, ".")
 		if ext > 0 {
 			switch path[ext:] {
