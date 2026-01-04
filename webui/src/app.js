@@ -205,21 +205,28 @@ Alpine.data('networkManager', () => ({
     },
 
     async loadDatacenters() {
+        this.loading = true;
         try {
-            this.datacenters = await api.get('/api/datacenters');
-            this.enrichNetworks();
+            const data = await api.get('/api/datacenters');
+            this.datacenters = Array.isArray(data) ? data : [];
         } catch (error) {
-            console.error('Failed to load datacenters', error);
+            Alpine.store('toast').notify('Failed to load datacenters', 'error');
+            this.datacenters = [];
+        } finally {
+            this.loading = false;
         }
     },
+
 
     async loadNetworks() {
         this.loading = true;
         try {
-            this.networks = await api.get('/api/networks');
+            const data = await api.get('/api/networks');
+            this.networks = Array.isArray(data) ? data : [];
             this.enrichNetworks();
         } catch (error) {
             Alpine.store('toast').notify('Failed to load networks', 'error');
+            this.networks = [];
         } finally {
             this.loading = false;
         }
@@ -405,10 +412,12 @@ Alpine.data('deviceManager', () => ({
             const url = this.searchQuery
                 ? `/api/search?q=${encodeURIComponent(this.searchQuery)}`
                 : '/api/devices';
-            this.devices = await api.get(url);
+            const data = await api.get(url);
+            this.devices = Array.isArray(data) ? data : [];
             this.enrichDevices();
         } catch (error) {
             Alpine.store('toast').notify('Failed to load devices', 'error');
+            this.devices = [];
         } finally {
             this.loading = false;
         }
