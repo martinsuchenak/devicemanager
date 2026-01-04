@@ -309,7 +309,7 @@
                             <template x-for="network in networks" :key="network.id">
                                 <tr class="hover:bg-gray-50 dark:hover:bg-gray-700">
                                     <td class="px-6 py-4 whitespace-nowrap">
-                                        <button class="text-sm font-medium text-gray-900 hover:text-blue-600 dark:text-gray-100 dark:hover:text-blue-400 text-left w-full" @click="viewNetwork(network.id)" x-text="network.name"></button>
+                                        <button class="text-sm font-medium text-gray-900 cursor-pointer hover:text-blue-600 dark:text-gray-100 dark:hover:text-blue-400 text-left w-full" @click="viewNetwork(network.id)" x-text="network.name"></button>
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap font-mono text-sm" x-text="network.subnet"></td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm" x-text="network.datacenter_name || '—'"></td>
@@ -369,7 +369,47 @@
                     </div>
                 </div>
             </div>
-             <!-- Network View Modal skipped for brevity but would follow same pattern -->
+            <!-- View Modal with x-trap -->
+            <div x-show="showViewModal" class="fixed inset-0 z-50 overflow-y-auto" role="dialog" aria-modal="true" x-trap.noscroll="showViewModal">
+                <div class="flex min-h-screen items-center justify-center p-4">
+                    <div x-show="showViewModal" class="fixed inset-0 bg-gray-900/20 backdrop-blur-sm transition-opacity dark:bg-gray-900/50" @click="closeViewModal()"></div>
+                    <div class="relative z-10 w-full max-w-lg bg-white rounded-lg shadow-xl dark:bg-gray-800">
+                        <div class="flex items-center justify-between border-b border-gray-200 px-6 py-4 dark:border-gray-700">
+                            <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Network Details</h3>
+                            <button type="button" @click="closeViewModal()" class="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300" aria-label="Close modal">
+                                <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                            </button>
+                        </div>
+                        <div class="px-6 py-4 space-y-4">
+                            <div>
+                                <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Name</p>
+                                <p class="mt-1 text-gray-900 dark:text-gray-100" x-text="currentNetwork.name"></p>
+                            </div>
+                            <div>
+                                <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Subnet</p>
+                                <p class="mt-1 text-gray-900 dark:text-gray-100 font-mono" x-text="currentNetwork.subnet"></p>
+                            </div>
+                            <div>
+                                <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Datacenter</p>
+                                <p class="mt-1 text-gray-900 dark:text-gray-100" x-text="currentNetwork.datacenter_name || 'None'"></p>
+                            </div>
+                            <div x-show="currentNetwork.description">
+                                <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Description</p>
+                                <p class="mt-1 text-gray-900 dark:text-gray-100 whitespace-pre-wrap" x-text="currentNetwork.description"></p>
+                            </div>
+                            <div>
+                                <p class="text-sm font-medium text-gray-500 dark:text-gray-400">ID</p>
+                                <p class="mt-1 text-sm text-gray-500 font-mono break-all dark:text-gray-400" x-text="currentNetwork.id"></p>
+                            </div>
+                        </div>
+                        <div class="border-t border-gray-200 px-6 py-4 bg-gray-50 dark:border-gray-700 dark:bg-gray-900 flex gap-3">
+                            <button @click="editCurrentNetwork()" class="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Edit</button>
+                            <button @click="deleteCurrentNetwork()" class="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">Delete</button>
+                            <button @click="closeViewModal()" class="flex-1 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-200">Close</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <!-- Datacenters View -->
@@ -397,7 +437,7 @@
                             <template x-for="dc in datacenters" :key="dc.id">
                                 <tr class="hover:bg-gray-50 dark:hover:bg-gray-700">
                                     <td class="px-6 py-4 whitespace-nowrap">
-                                        <button class="text-sm font-medium text-gray-900 hover:text-blue-600 dark:text-gray-100 dark:hover:text-blue-400 text-left w-full" @click="viewDatacenter(dc.id)" x-text="dc.name"></button>
+                                        <button class="text-sm font-medium text-gray-900 cursor-pointer hover:text-blue-600 dark:text-gray-100 dark:hover:text-blue-400 text-left w-full" @click="viewDatacenter(dc.id)" x-text="dc.name"></button>
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300" x-text="dc.location || '—'"></td>
                                     <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
