@@ -407,9 +407,9 @@ Alpine.data('deviceManager', () => ({
         }
         if (promises.length > 0) {
             await Promise.all(promises);
-            // Allow DOM to update options before binding form data
-            await new Promise(resolve => setTimeout(resolve, 50));
         }
+        // Always wait to ensure DOM options are rendered and ready for binding
+        await new Promise(resolve => setTimeout(resolve, 50));
     },
 
     async loadDatacenters() {
