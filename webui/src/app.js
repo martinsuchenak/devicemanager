@@ -475,7 +475,9 @@ Alpine.data('deviceManager', () => ({
         await this.ensureDependencies();
         this.modalTitle = 'Add Device';
         this.resetForm();
-        this.showModal = true;
+        this.$nextTick(() => {
+            this.showModal = true;
+        });
     },
 
     closeModal() {
@@ -572,7 +574,9 @@ Alpine.data('deviceManager', () => ({
         const device = this.currentDevice;
         this.prepareEditForm(device);
         this.closeViewModal();
-        this.showModal = true;
+        this.$nextTick(() => {
+            this.showModal = true;
+        });
     },
 
     async editDevice(id) {
@@ -580,7 +584,9 @@ Alpine.data('deviceManager', () => ({
             await this.ensureDependencies();
             const device = await api.get(`/api/devices/${id}`);
             this.prepareEditForm(device);
-            this.showModal = true;
+            this.$nextTick(() => {
+                this.showModal = true;
+            });
         } catch (error) {
             Alpine.store('toast').notify('Failed to load device', 'error');
         }
