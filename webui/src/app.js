@@ -575,6 +575,7 @@ Alpine.data('deviceManager', () => ({
         await this.ensureDependencies();
         const device = this.currentDevice;
         this.showModal = true;
+        this.closeViewModal();
         this.$nextTick(() => {
             this.prepareEditForm(device);
         });
