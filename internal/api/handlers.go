@@ -240,7 +240,11 @@ func (h *Handler) internalError(w http.ResponseWriter, err error) {
 
 // generateID generates a UUIDv7 for a device
 func generateID(name string) string {
-	return uuid.New().String()
+	id, err := uuid.NewV7()
+	if err != nil {
+		return uuid.New().String()
+	}
+	return id.String()
 }
 
 // StaticFileHandler serves static files (for the web UI)
@@ -575,8 +579,11 @@ func (h *Handler) getDatacenterDevices(w http.ResponseWriter, r *http.Request) {
 
 // generateDatacenterID generates a UUIDv7 for a datacenter
 func generateDatacenterID() string {
-	// Use uuid.New() which generates UUIDv7
-	return uuid.New().String()
+	id, err := uuid.NewV7()
+	if err != nil {
+		return uuid.New().String()
+	}
+	return id.String()
 }
 
 // Network CRUD handlers
@@ -785,6 +792,9 @@ func (h *Handler) getNetworkDevices(w http.ResponseWriter, r *http.Request) {
 
 // generateNetworkID generates a UUIDv7 for a network
 func generateNetworkID() string {
-	// Use uuid.New() which generates UUIDv7
-	return uuid.New().String()
+	id, err := uuid.NewV7()
+	if err != nil {
+		return uuid.New().String()
+	}
+	return id.String()
 }

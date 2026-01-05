@@ -104,7 +104,11 @@ func (ss *SQLiteStorage) MigrateToV2() error {
 
 		// Create datacenter entries from unique locations
 		for _, location := range locations {
-			dcID := uuid.New().String()
+			u, err := uuid.NewV7()
+			if err != nil {
+				return fmt.Errorf("generating UUIDv7 for datacenter: %w", err)
+			}
+			dcID := u.String()
 			_, err = tx.Exec(`
 				INSERT INTO datacenters (id, name, location, description, created_at, updated_at)
 				VALUES (?, ?, '', '', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
@@ -517,7 +521,11 @@ func (ss *SQLiteStorage) MigrateToV6() error {
 
 	// Migrate each non-UUID device
 	for _, oldID := range idsToMigrate {
-		newID := uuid.New().String()
+		u, err := uuid.NewV7()
+		if err != nil {
+			return fmt.Errorf("generating UUIDv7 for device: %w", err)
+		}
+		newID := u.String()
 
 		// Update devices table
 		_, err = tx.Exec("UPDATE devices SET id = ? WHERE id = ?", newID, oldID)
