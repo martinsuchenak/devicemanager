@@ -9,10 +9,11 @@ import (
 
 // Config holds the application configuration
 type Config struct {
-	DataDir     string
-	ListenAddr  string
-	BearerToken string
-	ConfigFile  string // Path to .env file (if loaded)
+	DataDir      string
+	ListenAddr   string
+	MCPAuthToken string
+	APIAuthToken string
+	ConfigFile   string // Path to .env file (if loaded)
 }
 
 // Load loads configuration with the following priority (highest to lowest):
@@ -25,9 +26,10 @@ type Config struct {
 // Otherwise, .env file overrides environment variables.
 func Load(opts *Config) *Config {
 	cfg := &Config{
-		DataDir:     "./data",
-		ListenAddr:  ":8080",
-		BearerToken: "",
+		DataDir:      "./data",
+		ListenAddr:   ":8080",
+		MCPAuthToken: "",
+		APIAuthToken: "",
 	}
 
 	// First, try to load from .env file
@@ -44,7 +46,8 @@ func Load(opts *Config) *Config {
 	// Then load environment variables (only if not already set by .env)
 	cfg.DataDir = coalesce(cfg.DataDir, os.Getenv("RACKD_DATA_DIR"), "./data")
 	cfg.ListenAddr = coalesce(cfg.ListenAddr, os.Getenv("RACKD_LISTEN_ADDR"), ":8080")
-	cfg.BearerToken = coalesce(cfg.BearerToken, os.Getenv("RACKD_BEARER_TOKEN"), "")
+	cfg.MCPAuthToken = coalesce(cfg.MCPAuthToken, os.Getenv("RACKD_BEARER_TOKEN"), "")
+	cfg.APIAuthToken = coalesce(cfg.APIAuthToken, os.Getenv("RACKD_API_TOKEN"), "")
 
 	// Finally, apply CLI opts if provided (highest priority)
 	if opts != nil {
@@ -54,8 +57,11 @@ func Load(opts *Config) *Config {
 		if opts.ListenAddr != "" {
 			cfg.ListenAddr = opts.ListenAddr
 		}
-		if opts.BearerToken != "" {
-			cfg.BearerToken = opts.BearerToken
+		if opts.MCPAuthToken != "" {
+			cfg.MCPAuthToken = opts.MCPAuthToken
+		}
+		if opts.APIAuthToken != "" {
+			cfg.APIAuthToken = opts.APIAuthToken
 		}
 	}
 
@@ -97,7 +103,9 @@ func loadFromEnvFile(cfg *Config, filename string) error {
 		case "RACKD_LISTEN_ADDR":
 			cfg.ListenAddr = value
 		case "RACKD_BEARER_TOKEN":
-			cfg.BearerToken = value
+			cfg.MCPAuthToken = value
+		case "RACKD_API_TOKEN":
+			cfg.APIAuthToken = value
 		}
 	}
 
@@ -106,7 +114,12 @@ func loadFromEnvFile(cfg *Config, filename string) error {
 
 // IsMCPEnabled checks if MCP authentication is configured
 func (c *Config) IsMCPEnabled() bool {
-	return c.BearerToken != ""
+	return c.MCPAuthToken != ""
+}
+
+// IsAPIAuthEnabled checks if API authentication is configured
+func (c *Config) IsAPIAuthEnabled() bool {
+	return c.APIAuthToken != ""
 }
 
 // String returns a string representation of the config source

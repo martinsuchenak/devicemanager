@@ -20,6 +20,7 @@ func main() {
 	dataDir := flag.String("data-dir", "", "Data directory path")
 	listenAddr := flag.String("addr", "", "Server listen address (e.g., :8080)")
 	bearerToken := flag.String("token", "", "MCP bearer token for authentication")
+	apiToken := flag.String("api-token", "", "API bearer token for authentication")
 	showVersion := flag.Bool("version", false, "Show version information")
 	showHelp := flag.Bool("help", false, "Show help information")
 
@@ -49,11 +50,14 @@ func main() {
 		cliOpts.ListenAddr = *listenAddr
 	}
 	if *bearerToken != "" {
-		cliOpts.BearerToken = *bearerToken
+		cliOpts.MCPAuthToken = *bearerToken
+	}
+	if *apiToken != "" {
+		cliOpts.APIAuthToken = *apiToken
 	}
 
 	// If any CLI flag was set, use it to override all other sources
-	if *dataDir != "" || *listenAddr != "" || *bearerToken != "" {
+	if *dataDir != "" || *listenAddr != "" || *bearerToken != "" || *apiToken != "" {
 		cfg = config.Load(cliOpts)
 	} else {
 		// No CLI flags, load from .env file or ENV vars
@@ -74,7 +78,7 @@ func main() {
 	apiHandler := api.NewHandler(store)
 
 	// Create MCP server
-	mcpServer := mcp.NewServer(store, cfg.BearerToken)
+	mcpServer := mcp.NewServer(store, cfg.MCPAuthToken)
 
 	// Setup HTTP routes
 	mux := http.NewServeMux()
@@ -88,10 +92,17 @@ func main() {
 	// Serve web UI at root (handles all / and /assets/* requests)
 	mux.Handle("/", ui.AssetHandler())
 
+	// Apply middleware
+	var handler http.Handler = mux
+	if cfg.IsAPIAuthEnabled() {
+		handler = api.AuthMiddleware(cfg.APIAuthToken, handler)
+	}
+	handler = api.SecurityHeadersMiddleware(handler)
+
 	// Start server
 	server := &http.Server{
 		Addr:    cfg.ListenAddr,
-		Handler: mux,
+		Handler: handler,
 	}
 
 	// Handle shutdown gracefully
@@ -110,6 +121,9 @@ func main() {
 	log.Printf("MCP: http://localhost%s/mcp", cfg.ListenAddr)
 	if cfg.IsMCPEnabled() {
 		log.Printf("MCP authentication: Enabled (bearer token required)")
+	}
+	if cfg.IsAPIAuthEnabled() {
+		log.Printf("API authentication: Enabled")
 	}
 	mcpServer.LogStartup()
 

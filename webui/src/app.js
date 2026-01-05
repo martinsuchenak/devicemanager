@@ -1,32 +1,77 @@
 import Alpine from 'alpinejs';
+import focus from '@alpinejs/focus';
+
+Alpine.plugin(focus);
+
+// Shared API helper
+const api = {
+    async request(url, options = {}) {
+        const response = await fetch(url, {
+            ...options,
+            headers: {
+                'Content-Type': 'application/json',
+                ...options.headers
+            }
+        });
+
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({}));
+            if (response.status === 401) throw new Error('Unauthorized: Please check your API token.');
+            if (response.status === 403) throw new Error('Forbidden: You do not have permission to perform this action.');
+            if (response.status === 409) throw new Error('Conflict: An item with this name already exists.');
+            if (response.status === 400) throw new Error(error.error || 'Invalid data provided. Please check your inputs.');
+
+            throw new Error(error.error || `Request failed with status ${response.status}`);
+        }
+
+        // For 204 No Content
+        if (response.status === 204) return null;
+
+        return await response.json();
+    },
+    get(url) { return this.request(url); },
+    post(url, data) { return this.request(url, { method: 'POST', body: JSON.stringify(data) }); },
+    put(url, data) { return this.request(url, { method: 'PUT', body: JSON.stringify(data) }); },
+    delete(url) { return this.request(url, { method: 'DELETE' }); }
+};
+
+// Global Toast Store
+Alpine.store('toast', {
+    show: false,
+    message: '',
+    type: 'info',
+    notify(message, type = 'info') {
+        this.message = message;
+        this.type = type;
+        this.show = true;
+        setTimeout(() => { this.show = false; }, 3000);
+    }
+});
 
 Alpine.data('datacenterManager', () => ({
     datacenters: [],
     loading: false,
     saving: false,
     showModal: false,
+    showViewModal: false,
     modalTitle: 'Add Datacenter',
     currentDatacenter: {},
-    form: {
-        id: '',
-        name: '',
-        location: '',
-        description: ''
-    },
-    toast: { show: false, message: '', type: 'info' },
+    form: { id: '', name: '', location: '', description: '' },
 
-    async init() {
-        await this.loadDatacenters();
+    init() {
+        this.loadDatacenters();
+        // Listen for refresh events
+        window.addEventListener('refresh-datacenters', () => this.loadDatacenters());
     },
 
     async loadDatacenters() {
         this.loading = true;
         try {
-            const response = await fetch('/api/datacenters');
-            if (!response.ok) throw new Error('Failed to load datacenters');
-            this.datacenters = await response.json();
+            const data = await api.get('/api/datacenters');
+            this.datacenters = Array.isArray(data) ? data : [];
         } catch (error) {
-            this.showToast('Failed to load datacenters', 'error');
+            Alpine.store('toast').notify('Failed to load datacenters', 'error');
+            this.datacenters = [];
         } finally {
             this.loading = false;
         }
@@ -44,111 +89,107 @@ Alpine.data('datacenterManager', () => ({
     },
 
     resetForm() {
-        this.form = {
-            id: '',
-            name: '',
-            location: '',
-            description: ''
-        };
+        this.form = { id: '', name: '', location: '', description: '' };
     },
 
     async saveDatacenter() {
         this.saving = true;
         try {
-            const datacenter = {
+            const payload = {
                 name: this.form.name,
                 location: this.form.location || '',
                 description: this.form.description || ''
             };
 
-            const url = this.form.id
-                ? `/api/datacenters/${this.form.id}`
-                : '/api/datacenters';
-            const method = this.form.id ? 'PUT' : 'POST';
-
-            const response = await fetch(url, {
-                method,
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(datacenter)
-            });
-
-            if (!response.ok) {
-                const error = await response.json();
-                throw new Error(error.error || 'Failed to save datacenter');
+            if (this.form.id) {
+                await api.put(`/api/datacenters/${this.form.id}`, payload);
+                Alpine.store('toast').notify('Datacenter updated successfully', 'success');
+            } else {
+                await api.post('/api/datacenters', payload);
+                Alpine.store('toast').notify('Datacenter created successfully', 'success');
             }
 
-            this.showToast(this.form.id ? 'Datacenter updated successfully' : 'Datacenter created successfully', 'success');
             this.closeModal();
             this.loadDatacenters();
-            // Refresh device manager's datacenters list
-            if (window.deviceManagerRefreshDatacenters) {
-                window.deviceManagerRefreshDatacenters();
-            }
+            // Dispatch event for other components
+            window.dispatchEvent(new CustomEvent('refresh-datacenters'));
         } catch (error) {
-            this.showToast(error.message, 'error');
+            Alpine.store('toast').notify(error.message, 'error');
         } finally {
             this.saving = false;
         }
     },
 
-    async editDatacenter(id) {
+    async viewDatacenter(id) {
         try {
-            const response = await fetch(`/api/datacenters/${id}`);
-            if (!response.ok) throw new Error('Failed to load datacenter');
-            const datacenter = await response.json();
-            this.modalTitle = 'Edit Datacenter';
-            this.form = {
-                id: datacenter.id || '',
-                name: datacenter.name || '',
-                location: datacenter.location || '',
-                description: datacenter.description || ''
-            };
-            this.showModal = true;
+            this.currentDatacenter = await api.get(`/api/datacenters/${id}`);
+            this.showViewModal = true;
         } catch (error) {
-            this.showToast('Failed to load datacenter', 'error');
+            Alpine.store('toast').notify('Failed to load datacenter', 'error');
         }
     },
 
+    closeViewModal() {
+        this.showViewModal = false;
+        this.currentDatacenter = {};
+    },
+
+    editCurrentDatacenter() {
+        const dc = this.currentDatacenter;
+        this.prepareEditForm(dc);
+        this.closeViewModal();
+        this.showModal = true;
+    },
+
+    async editDatacenter(id) {
+        try {
+            const datacenter = await api.get(`/api/datacenters/${id}`);
+            this.prepareEditForm(datacenter);
+            this.showModal = true;
+        } catch (error) {
+            Alpine.store('toast').notify('Failed to load datacenter', 'error');
+        }
+    },
+
+    prepareEditForm(datacenter) {
+        this.modalTitle = 'Edit Datacenter';
+        this.form = {
+            id: datacenter.id || '',
+            name: datacenter.name || '',
+            location: datacenter.location || '',
+            description: datacenter.description || ''
+        };
+    },
+
     async deleteDatacenter(id) {
-        const deviceCount = await this.getDatacenterDeviceCount(id);
+        // Check for associated devices
+        let deviceCount = 0;
+        try {
+            const devices = await api.get(`/api/datacenters/${id}/devices`);
+            deviceCount = devices.length;
+        } catch (e) { /* ignore error */ }
+
         const message = deviceCount > 0
-            ? `Are you sure you want to delete this datacenter? ${deviceCount} devices will lose their datacenter association.`
+            ? `Are you sure you want to delete this datacenter? ${deviceCount} devices will lose their association.`
             : 'Are you sure you want to delete this datacenter?';
 
         if (!confirm(message)) return;
 
         try {
-            const response = await fetch(`/api/datacenters/${id}`, {
-                method: 'DELETE'
-            });
-
-            if (!response.ok) throw new Error('Failed to delete datacenter');
-
-            this.showToast('Datacenter deleted successfully', 'success');
+            await api.delete(`/api/datacenters/${id}`);
+            Alpine.store('toast').notify('Datacenter deleted successfully', 'success');
             this.loadDatacenters();
-            // Refresh device manager's datacenters list
-            if (window.deviceManagerRefreshDatacenters) {
-                window.deviceManagerRefreshDatacenters();
+            window.dispatchEvent(new CustomEvent('refresh-datacenters'));
+            if (this.showViewModal && this.currentDatacenter.id === id) {
+                this.closeViewModal();
             }
         } catch (error) {
-            this.showToast('Failed to delete datacenter', 'error');
+            Alpine.store('toast').notify('Failed to delete datacenter', 'error');
         }
     },
 
-    async getDatacenterDeviceCount(datacenterId) {
-        try {
-            const response = await fetch(`/api/datacenters/${datacenterId}/devices`);
-            if (!response.ok) return 0;
-            const devices = await response.json();
-            return devices.length;
-        } catch {
-            return 0;
-        }
-    },
-
-    showToast(message, type = 'info') {
-        this.toast = { show: true, message, type };
-        setTimeout(() => { this.toast.show = false; }, 3000);
+    deleteCurrentDatacenter() {
+        this.deleteDatacenter(this.currentDatacenter.id);
     }
 }));
 
@@ -159,59 +200,51 @@ Alpine.data('networkManager', () => ({
     saving: false,
     showModal: false,
     showViewModal: false,
-    searchQuery: '',
     modalTitle: 'Add Network',
     currentNetwork: {},
-    form: {
-        id: '',
-        name: '',
-        subnet: '',
-        datacenter_id: '',
-        description: ''
-    },
-    toast: { show: false, message: '', type: 'info' },
+    form: { id: '', name: '', subnet: '', datacenter_id: '', description: '' },
 
-    async init() {
-        await Promise.all([this.loadNetworks(), this.loadDatacenters()]);
-        // Register refresh function for device manager
-        window.networkManagerRefreshNetworks = () => this.loadNetworks();
+    init() {
+        this.loadNetworks();
+        this.loadDatacenters();
+        window.addEventListener('refresh-networks', () => this.loadNetworks());
+        window.addEventListener('refresh-datacenters', () => this.loadDatacenters());
     },
 
     async loadDatacenters() {
-        try {
-            const response = await fetch('/api/datacenters');
-            if (!response.ok) throw new Error('Failed to load datacenters');
-            this.datacenters = await response.json();
-        } catch (error) {
-            console.error('Failed to load datacenters:', error);
-        }
-    },
-
-    async loadNetworks() {
         this.loading = true;
         try {
-            const response = await fetch('/api/networks');
-            if (!response.ok) throw new Error('Failed to load networks');
-            this.networks = await response.json();
-            // Enrich networks with datacenter names
-            this.enrichNetworksWithDatacenters();
+            const data = await api.get('/api/datacenters');
+            this.datacenters = Array.isArray(data) ? data : [];
         } catch (error) {
-            this.showToast('Failed to load networks', 'error');
+            Alpine.store('toast').notify('Failed to load datacenters', 'error');
+            this.datacenters = [];
         } finally {
             this.loading = false;
         }
     },
 
-    enrichNetworksWithDatacenters() {
+
+    async loadNetworks() {
+        this.loading = true;
+        try {
+            const data = await api.get('/api/networks');
+            this.networks = Array.isArray(data) ? data : [];
+            this.enrichNetworks();
+        } catch (error) {
+            Alpine.store('toast').notify('Failed to load networks', 'error');
+            this.networks = [];
+        } finally {
+            this.loading = false;
+        }
+    },
+
+    enrichNetworks() {
+        if (!this.networks.length || !this.datacenters.length) return;
         this.networks = this.networks.map(network => ({
             ...network,
             datacenter_name: this.datacenters.find(dc => dc.id === network.datacenter_id)?.name || null
         }));
-    },
-
-    clearSearch() {
-        this.searchQuery = '';
-        this.loadNetworks();
     },
 
     openAddModal() {
@@ -226,50 +259,32 @@ Alpine.data('networkManager', () => ({
     },
 
     resetForm() {
-        this.form = {
-            id: '',
-            name: '',
-            subnet: '',
-            datacenter_id: '',
-            description: ''
-        };
+        this.form = { id: '', name: '', subnet: '', datacenter_id: '', description: '' };
     },
 
     async saveNetwork() {
         this.saving = true;
         try {
-            const network = {
+            const payload = {
                 name: this.form.name,
                 subnet: this.form.subnet,
                 datacenter_id: this.form.datacenter_id,
                 description: this.form.description || ''
             };
 
-            const url = this.form.id
-                ? `/api/networks/${this.form.id}`
-                : '/api/networks';
-            const method = this.form.id ? 'PUT' : 'POST';
-
-            const response = await fetch(url, {
-                method,
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(network)
-            });
-
-            if (!response.ok) {
-                const error = await response.json();
-                throw new Error(error.error || 'Failed to save network');
+            if (this.form.id) {
+                await api.put(`/api/networks/${this.form.id}`, payload);
+                Alpine.store('toast').notify('Network updated successfully', 'success');
+            } else {
+                await api.post('/api/networks', payload);
+                Alpine.store('toast').notify('Network created successfully', 'success');
             }
 
-            this.showToast(this.form.id ? 'Network updated successfully' : 'Network created successfully', 'success');
             this.closeModal();
             this.loadNetworks();
-            // Refresh device manager's networks list
-            if (window.deviceManagerRefreshNetworks) {
-                window.deviceManagerRefreshNetworks();
-            }
+            window.dispatchEvent(new CustomEvent('refresh-networks'));
         } catch (error) {
-            this.showToast(error.message, 'error');
+            Alpine.store('toast').notify(error.message, 'error');
         } finally {
             this.saving = false;
         }
@@ -277,15 +292,12 @@ Alpine.data('networkManager', () => ({
 
     async viewNetwork(id) {
         try {
-            const response = await fetch(`/api/networks/${id}`);
-            if (!response.ok) throw new Error('Failed to load network');
-            const network = await response.json();
-            // Enrich with datacenter name
+            const network = await api.get(`/api/networks/${id}`);
             network.datacenter_name = this.datacenters.find(dc => dc.id === network.datacenter_id)?.name || null;
             this.currentNetwork = network;
             this.showViewModal = true;
         } catch (error) {
-            this.showToast('Failed to load network', 'error');
+            Alpine.store('toast').notify('Failed to load network', 'error');
         }
     },
 
@@ -296,6 +308,22 @@ Alpine.data('networkManager', () => ({
 
     editCurrentNetwork() {
         const network = this.currentNetwork;
+        this.prepareEditForm(network);
+        this.closeViewModal();
+        this.showModal = true;
+    },
+
+    async editNetwork(id) {
+        try {
+            const network = await api.get(`/api/networks/${id}`);
+            this.prepareEditForm(network);
+            this.showModal = true;
+        } catch (error) {
+            Alpine.store('toast').notify('Failed to load network', 'error');
+        }
+    },
+
+    prepareEditForm(network) {
         this.modalTitle = 'Edit Network';
         this.form = {
             id: network.id || '',
@@ -304,31 +332,15 @@ Alpine.data('networkManager', () => ({
             datacenter_id: network.datacenter_id || '',
             description: network.description || ''
         };
-        this.closeViewModal();
-        this.showModal = true;
-    },
-
-    async editNetwork(id) {
-        try {
-            const response = await fetch(`/api/networks/${id}`);
-            if (!response.ok) throw new Error('Failed to load network');
-            const network = await response.json();
-            this.modalTitle = 'Edit Network';
-            this.form = {
-                id: network.id || '',
-                name: network.name || '',
-                subnet: network.subnet || '',
-                datacenter_id: network.datacenter_id || '',
-                description: network.description || ''
-            };
-            this.showModal = true;
-        } catch (error) {
-            this.showToast('Failed to load network', 'error');
-        }
     },
 
     async deleteNetwork(id) {
-        const deviceCount = await this.getNetworkDeviceCount(id);
+        let deviceCount = 0;
+        try {
+            const devices = await api.get(`/api/networks/${id}/devices`);
+            deviceCount = devices.length;
+        } catch (e) { /* ignore */ }
+
         const message = deviceCount > 0
             ? `Are you sure you want to delete this network? ${deviceCount} devices will lose their network association.`
             : 'Are you sure you want to delete this network?';
@@ -336,64 +348,20 @@ Alpine.data('networkManager', () => ({
         if (!confirm(message)) return;
 
         try {
-            const response = await fetch(`/api/networks/${id}`, {
-                method: 'DELETE'
-            });
-
-            if (!response.ok) throw new Error('Failed to delete network');
-
-            this.showToast('Network deleted successfully', 'success');
+            await api.delete(`/api/networks/${id}`);
+            Alpine.store('toast').notify('Network deleted successfully', 'success');
             this.loadNetworks();
-            // Refresh device manager's networks list
-            if (window.deviceManagerRefreshNetworks) {
-                window.deviceManagerRefreshNetworks();
+            window.dispatchEvent(new CustomEvent('refresh-networks'));
+            if (this.showViewModal && this.currentNetwork.id === id) {
+                this.closeViewModal();
             }
         } catch (error) {
-            this.showToast('Failed to delete network', 'error');
+            Alpine.store('toast').notify('Failed to delete network', 'error');
         }
     },
 
-    async deleteCurrentNetwork() {
-        const deviceCount = await this.getNetworkDeviceCount(this.currentNetwork.id);
-        const message = deviceCount > 0
-            ? `Are you sure you want to delete this network? ${deviceCount} devices will lose their network association.`
-            : 'Are you sure you want to delete this network?';
-
-        if (!confirm(message)) return;
-
-        try {
-            const response = await fetch(`/api/networks/${this.currentNetwork.id}`, {
-                method: 'DELETE'
-            });
-
-            if (!response.ok) throw new Error('Failed to delete network');
-
-            this.showToast('Network deleted successfully', 'success');
-            this.closeViewModal();
-            this.loadNetworks();
-            // Refresh device manager's networks list
-            if (window.deviceManagerRefreshNetworks) {
-                window.deviceManagerRefreshNetworks();
-            }
-        } catch (error) {
-            this.showToast('Failed to delete network', 'error');
-        }
-    },
-
-    async getNetworkDeviceCount(networkId) {
-        try {
-            const response = await fetch(`/api/networks/${networkId}/devices`);
-            if (!response.ok) return 0;
-            const devices = await response.json();
-            return devices.length;
-        } catch {
-            return 0;
-        }
-    },
-
-    showToast(message, type = 'info') {
-        this.toast = { show: true, message, type };
-        setTimeout(() => { this.toast.show = false; }, 3000);
+    deleteCurrentNetwork() {
+        this.deleteNetwork(this.currentNetwork.id);
     }
 }));
 
@@ -409,44 +377,60 @@ Alpine.data('deviceManager', () => ({
     modalTitle: 'Add Device',
     currentDevice: {},
     form: {
-        id: '',
-        name: '',
-        description: '',
-        make_model: '',
-        os: '',
-        datacenter_id: '',
-        username: '',
-        tagsInput: '',
-        domainsInput: '',
-        addresses: [{ ip: '', port: '', type: 'ipv4', label: '', network_id: '', switch_port: '' }]
+        id: '', name: '', description: '', make_model: '', os: '',
+        datacenter_id: '', username: '', tagsInput: '', domainsInput: '',
+        addresses: []
     },
-    toast: { show: false, message: '', type: 'info' },
 
-    async init() {
-        await Promise.all([this.loadDevices(), this.loadDatacenters(), this.loadNetworks()]);
-        // Register refresh function for datacenter manager
-        window.deviceManagerRefreshDatacenters = () => this.loadDatacenters();
-        // Register refresh function for network manager
-        window.deviceManagerRefreshNetworks = () => this.loadNetworks();
+    init() {
+        this.loadDevices();
+        this.loadDatacenters();
+        this.loadNetworks();
+
+        window.addEventListener('refresh-datacenters', () => {
+            this.loadDatacenters();
+            this.loadDevices(); // Reload devices to update datacenter names
+        });
+        window.addEventListener('refresh-networks', () => {
+            this.loadNetworks();
+            this.loadDevices(); // Reload devices to update network names
+        });
+    },
+
+    async ensureDependencies() {
+        const promises = [];
+        if (!this.networks || this.networks.length === 0) {
+            promises.push(this.loadNetworks());
+        }
+        if (!this.datacenters || this.datacenters.length === 0) {
+            promises.push(this.loadDatacenters());
+        }
+        if (promises.length > 0) {
+            await Promise.all(promises);
+        }
+        // Always wait to ensure DOM options are rendered and ready for binding
+        await new Promise(resolve => setTimeout(resolve, 50));
     },
 
     async loadDatacenters() {
         try {
-            const response = await fetch('/api/datacenters');
-            if (!response.ok) throw new Error('Failed to load datacenters');
-            this.datacenters = await response.json();
+            const data = await api.get('/api/datacenters');
+            this.datacenters = Array.isArray(data) ? data : [];
+            this.enrichDevices();
         } catch (error) {
-            console.error('Failed to load datacenters:', error);
+            console.error('Failed to load datacenters', error);
+            this.datacenters = [];
         }
     },
 
     async loadNetworks() {
         try {
-            const response = await fetch('/api/networks');
-            if (!response.ok) throw new Error('Failed to load networks');
-            this.networks = await response.json();
+            const data = await api.get('/api/networks');
+            this.networks = Array.isArray(data) ? data : [];
+            this.enrichDevices();
         } catch (error) {
-            console.error('Failed to load networks:', error);
+            console.error('Failed to load networks', error);
+            this.networks = [];
         }
     },
 
@@ -456,32 +440,31 @@ Alpine.data('deviceManager', () => ({
             const url = this.searchQuery
                 ? `/api/search?q=${encodeURIComponent(this.searchQuery)}`
                 : '/api/devices';
-            const response = await fetch(url);
-            if (!response.ok) throw new Error('Failed to load devices');
-            this.devices = await response.json();
-            // Enrich devices with datacenter names
-            this.enrichDevicesWithDatacenters();
+            const data = await api.get(url);
+            this.devices = Array.isArray(data) ? data : [];
+            this.enrichDevices();
         } catch (error) {
-            this.showToast('Failed to load devices', 'error');
+            Alpine.store('toast').notify('Failed to load devices', 'error');
+            this.devices = [];
         } finally {
             this.loading = false;
         }
     },
 
-    enrichDevicesWithDatacenters() {
+    enrichDevices() {
+        if (!this.devices) return;
         this.devices = this.devices.map(device => {
-            const enrichedDevice = {
+            const enriched = {
                 ...device,
                 datacenter_name: this.datacenters.find(dc => dc.id === device.datacenter_id)?.name || null
             };
-            // Enrich addresses with network names
-            if (enrichedDevice.addresses) {
-                enrichedDevice.addresses = enrichedDevice.addresses.map(addr => ({
+            if (enriched.addresses) {
+                enriched.addresses = enriched.addresses.map(addr => ({
                     ...addr,
                     network_name: this.networks.find(n => n.id === addr.network_id)?.name || null
                 }));
             }
-            return enrichedDevice;
+            return enriched;
         });
     },
 
@@ -490,10 +473,13 @@ Alpine.data('deviceManager', () => ({
         this.loadDevices();
     },
 
-    openAddModal() {
+    async openAddModal() {
+        await this.ensureDependencies();
         this.modalTitle = 'Add Device';
         this.resetForm();
-        this.showModal = true;
+        this.$nextTick(() => {
+            this.showModal = true;
+        });
     },
 
     closeModal() {
@@ -503,15 +489,8 @@ Alpine.data('deviceManager', () => ({
 
     resetForm() {
         this.form = {
-            id: '',
-            name: '',
-            description: '',
-            make_model: '',
-            os: '',
-            datacenter_id: '',
-            username: '',
-            tagsInput: '',
-            domainsInput: '',
+            id: '', name: '', description: '', make_model: '', os: '',
+            datacenter_id: '', username: '', tagsInput: '', domainsInput: '',
             addresses: [{ ip: '', port: '', type: 'ipv4', label: '', network_id: '', switch_port: '' }]
         };
     },
@@ -530,7 +509,6 @@ Alpine.data('deviceManager', () => ({
     async saveDevice() {
         this.saving = true;
         try {
-            // Clean up addresses - convert empty ports to null/omit them
             const addresses = this.form.addresses
                 .filter(a => a.ip)
                 .map(a => ({
@@ -542,7 +520,7 @@ Alpine.data('deviceManager', () => ({
                     switch_port: a.switch_port || ''
                 }));
 
-            const device = {
+            const payload = {
                 name: this.form.name,
                 description: this.form.description || '',
                 make_model: this.form.make_model || '',
@@ -554,25 +532,18 @@ Alpine.data('deviceManager', () => ({
                 addresses: addresses
             };
 
-            const url = this.form.id ? `/api/devices/${this.form.id}` : '/api/devices';
-            const method = this.form.id ? 'PUT' : 'POST';
-
-            const response = await fetch(url, {
-                method,
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(device)
-            });
-
-            if (!response.ok) {
-                const error = await response.json();
-                throw new Error(error.error || 'Failed to save device');
+            if (this.form.id) {
+                await api.put(`/api/devices/${this.form.id}`, payload);
+                Alpine.store('toast').notify('Device updated successfully', 'success');
+            } else {
+                await api.post('/api/devices', payload);
+                Alpine.store('toast').notify('Device created successfully', 'success');
             }
 
-            this.showToast(this.form.id ? 'Device updated successfully' : 'Device created successfully', 'success');
             this.closeModal();
             this.loadDevices();
         } catch (error) {
-            this.showToast(error.message, 'error');
+            Alpine.store('toast').notify(error.message, 'error');
         } finally {
             this.saving = false;
         }
@@ -580,12 +551,8 @@ Alpine.data('deviceManager', () => ({
 
     async viewDevice(id) {
         try {
-            const response = await fetch(`/api/devices/${id}`);
-            if (!response.ok) throw new Error('Failed to load device');
-            const device = await response.json();
-            // Enrich with datacenter name
+            const device = await api.get(`/api/devices/${id}`);
             device.datacenter_name = this.datacenters.find(dc => dc.id === device.datacenter_id)?.name || null;
-            // Enrich addresses with network names
             if (device.addresses) {
                 device.addresses = device.addresses.map(addr => ({
                     ...addr,
@@ -595,7 +562,7 @@ Alpine.data('deviceManager', () => ({
             this.currentDevice = device;
             this.showViewModal = true;
         } catch (error) {
-            this.showToast('Failed to load device', 'error');
+            Alpine.store('toast').notify('Failed to load device', 'error');
         }
     },
 
@@ -604,9 +571,35 @@ Alpine.data('deviceManager', () => ({
         this.currentDevice = {};
     },
 
-    editCurrentDevice() {
+    async editCurrentDevice() {
+        await this.ensureDependencies();
         const device = this.currentDevice;
+        this.showModal = true;
+        this.closeViewModal();
+        this.$nextTick(() => {
+            this.prepareEditForm(device);
+        });
+    },
+
+    async editDevice(id) {
+        try {
+            await this.ensureDependencies();
+            const device = await api.get(`/api/devices/${id}`);
+            this.showModal = true;
+            this.$nextTick(() => {
+                this.prepareEditForm(device);
+            });
+        } catch (error) {
+            Alpine.store('toast').notify('Failed to load device', 'error');
+        }
+    },
+
+    prepareEditForm(device) {
         this.modalTitle = 'Edit Device';
+        const addresses = device.addresses && device.addresses.length > 0
+            ? device.addresses.map(a => ({ ...a, network_id: a.network_id || '' }))
+            : [{ ip: '', port: '', type: 'ipv4', label: '', network_id: '', switch_port: '' }];
+
         this.form = {
             id: device.id || '',
             name: device.name || '',
@@ -617,78 +610,26 @@ Alpine.data('deviceManager', () => ({
             username: device.username || '',
             tagsInput: (device.tags || []).join(', '),
             domainsInput: (device.domains || []).join(', '),
-            addresses: device.addresses && device.addresses.length > 0
-                ? [...device.addresses]
-                : [{ ip: '', port: '', type: 'ipv4', label: '', network_id: '', switch_port: '' }]
+            addresses: addresses
         };
-        this.closeViewModal();
-        this.showModal = true;
     },
 
-    async editDevice(id) {
-        try {
-            const response = await fetch(`/api/devices/${id}`);
-            if (!response.ok) throw new Error('Failed to load device');
-            const device = await response.json();
-            this.modalTitle = 'Edit Device';
-            this.form = {
-                id: device.id || '',
-                name: device.name || '',
-                description: device.description || '',
-                make_model: device.make_model || '',
-                os: device.os || '',
-                datacenter_id: device.datacenter_id || '',
-                username: device.username || '',
-                tagsInput: (device.tags || []).join(', '),
-                domainsInput: (device.domains || []).join(', '),
-                addresses: device.addresses && device.addresses.length > 0
-                    ? [...device.addresses]
-                    : [{ ip: '', port: '', type: 'ipv4', label: '', network_id: '', switch_port: '' }]
-            };
-            this.showModal = true;
-        } catch (error) {
-            this.showToast('Failed to load device', 'error');
-        }
-    },
-
-    async deleteDeviceFromList(id) {
+    async deleteDevice(id) {
         if (!confirm('Are you sure you want to delete this device?')) return;
-
         try {
-            const response = await fetch(`/api/devices/${id}`, {
-                method: 'DELETE'
-            });
-
-            if (!response.ok) throw new Error('Failed to delete device');
-
-            this.showToast('Device deleted successfully', 'success');
+            await api.delete(`/api/devices/${id}`);
+            Alpine.store('toast').notify('Device deleted successfully', 'success');
             this.loadDevices();
+            if (this.showViewModal && this.currentDevice.id === id) {
+                this.closeViewModal();
+            }
         } catch (error) {
-            this.showToast('Failed to delete device', 'error');
+            Alpine.store('toast').notify('Failed to delete device', 'error');
         }
     },
 
-    async deleteCurrentDevice() {
-        if (!confirm('Are you sure you want to delete this device?')) return;
-
-        try {
-            const response = await fetch(`/api/devices/${this.currentDevice.id}`, {
-                method: 'DELETE'
-            });
-
-            if (!response.ok) throw new Error('Failed to delete device');
-
-            this.showToast('Device deleted successfully', 'success');
-            this.closeViewModal();
-            this.loadDevices();
-        } catch (error) {
-            this.showToast('Failed to delete device', 'error');
-        }
-    },
-
-    showToast(message, type = 'info') {
-        this.toast = { show: true, message, type };
-        setTimeout(() => { this.toast.show = false; }, 3000);
+    deleteCurrentDevice() {
+        this.deleteDevice(this.currentDevice.id);
     }
 }));
 

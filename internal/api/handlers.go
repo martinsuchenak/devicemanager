@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"log"
+	"net"
 	"net/http"
 	"strings"
 	"time"
@@ -108,6 +109,14 @@ func (h *Handler) createDevice(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Validate IP addresses
+	for _, addr := range device.Addresses {
+		if net.ParseIP(addr.IP) == nil {
+			h.writeError(w, http.StatusBadRequest, "invalid IP address: "+addr.IP)
+			return
+		}
+	}
+
 	// Generate ID if not provided
 	if device.ID == "" {
 		device.ID = generateID(device.Name)
@@ -151,6 +160,14 @@ func (h *Handler) updateDevice(w http.ResponseWriter, r *http.Request) {
 	// Ensure ID matches URL
 	device.ID = id
 	device.UpdatedAt = time.Now()
+
+	// Validate IP addresses
+	for _, addr := range device.Addresses {
+		if net.ParseIP(addr.IP) == nil {
+			h.writeError(w, http.StatusBadRequest, "invalid IP address: "+addr.IP)
+			return
+		}
+	}
 
 	if err := h.storage.UpdateDevice(&device); err != nil {
 		if errors.Is(err, storage.ErrDeviceNotFound) {
@@ -221,10 +238,13 @@ func (h *Handler) internalError(w http.ResponseWriter, err error) {
 	h.writeError(w, http.StatusInternalServerError, "Internal Server Error")
 }
 
-// generateID generates a simple ID from a name
+// generateID generates a UUIDv7 for a device
 func generateID(name string) string {
-	// Simple ID generation - could use UUID in production
-	return strings.ToLower(strings.ReplaceAll(strings.TrimSpace(name), " ", "-")) + "-" + time.Now().Format("20060102150405")
+	id, err := uuid.NewV7()
+	if err != nil {
+		return uuid.New().String()
+	}
+	return id.String()
 }
 
 // StaticFileHandler serves static files (for the web UI)
@@ -559,8 +579,11 @@ func (h *Handler) getDatacenterDevices(w http.ResponseWriter, r *http.Request) {
 
 // generateDatacenterID generates a UUIDv7 for a datacenter
 func generateDatacenterID() string {
-	// Use uuid.New() which generates UUIDv7
-	return uuid.New().String()
+	id, err := uuid.NewV7()
+	if err != nil {
+		return uuid.New().String()
+	}
+	return id.String()
 }
 
 // Network CRUD handlers
@@ -631,6 +654,10 @@ func (h *Handler) createNetwork(w http.ResponseWriter, r *http.Request) {
 		h.writeError(w, http.StatusBadRequest, "subnet is required")
 		return
 	}
+	if _, _, err := net.ParseCIDR(network.Subnet); err != nil {
+		h.writeError(w, http.StatusBadRequest, "invalid subnet CIDR: "+network.Subnet)
+		return
+	}
 	if network.DatacenterID == "" {
 		h.writeError(w, http.StatusBadRequest, "datacenter_id is required")
 		return
@@ -679,6 +706,14 @@ func (h *Handler) updateNetwork(w http.ResponseWriter, r *http.Request) {
 
 	// Ensure ID matches URL
 	network.ID = id
+
+	// Validate subnet if provided (though it's required in model, JSON decode might leave it empty or partially filled)
+	if network.Subnet != "" {
+		if _, _, err := net.ParseCIDR(network.Subnet); err != nil {
+			h.writeError(w, http.StatusBadRequest, "invalid subnet CIDR: "+network.Subnet)
+			return
+		}
+	}
 
 	netStorage, ok := h.storage.(storage.NetworkStorage)
 	if !ok {
@@ -757,6 +792,9 @@ func (h *Handler) getNetworkDevices(w http.ResponseWriter, r *http.Request) {
 
 // generateNetworkID generates a UUIDv7 for a network
 func generateNetworkID() string {
-	// Use uuid.New() which generates UUIDv7
-	return uuid.New().String()
+	id, err := uuid.NewV7()
+	if err != nil {
+		return uuid.New().String()
+	}
+	return id.String()
 }

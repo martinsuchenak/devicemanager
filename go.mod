@@ -6,7 +6,6 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/paularlott/cli v0.6.0
 	github.com/paularlott/mcp v0.7.1
-	github.com/pelletier/go-toml/v2 v2.2.4
 	modernc.org/sqlite v1.42.2
 )
 

@@ -134,6 +134,14 @@ docker-push:
 	$(DOCKER) push rackd:$(VERSION)
 	$(DOCKER) push rackd:latest
 
+## push-tag: Create and push a git tag (usage: make push-tag TAG=v1.0.0)
+push-tag:
+ifndef TAG
+	$(error TAG is undefined. Usage: make push-tag TAG=v1.0.0)
+endif
+	git tag $(TAG)
+	git push origin $(TAG)
+
 ## docker-compose-up: Start services with docker-compose
 docker-compose-up:
 	@echo "Starting docker-compose..."
@@ -175,9 +183,9 @@ nomad-status:
 	nomad alloc status -job rackd
 
 ## run-server: Run server locally
-run-server:
+run-server: server
 	@echo "Starting server..."
-	$(GO) run $(CMD_DIR)/server
+	$(BUILD_DIR)/$(BINARY_SERVER)
 
 ## run-cli: Run CLI locally
 run-cli:
@@ -230,11 +238,9 @@ ui-install:
 
 ## ui-build: Build UI assets
 ui-build:
+	@echo "Installing dependencies..."
+	@export PATH="$(HOME)/.bun/bin:$$PATH" && cd $(WEBUI_DIR) && bun install
 	@echo "Building UI assets..."
-	@if [ ! -d "$(WEBUI_DIR)/node_modules" ]; then \
-		echo "Installing dependencies first..."; \
-		export PATH="$(HOME)/.bun/bin:$$PATH" && cd $(WEBUI_DIR) && bun install; \
-	fi
 	@export PATH="$(HOME)/.bun/bin:$$PATH" && cd $(WEBUI_DIR) && bun run build
 	@mkdir -p $(ASSETS_DIR)
 	@cp $(WEBUI_DIR)/src/index.html $(ASSETS_DIR)/index.html

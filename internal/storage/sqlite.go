@@ -133,6 +133,10 @@ func (ss *SQLiteStorage) initSchema() error {
 		return fmt.Errorf("running MigrateToV5: %w", err)
 	}
 
+	if err := ss.MigrateToV6(); err != nil {
+		return fmt.Errorf("running MigrateToV6: %w", err)
+	}
+
 	return nil
 }
 
@@ -574,59 +578,6 @@ func (ss *SQLiteStorage) GetRelatedDevices(deviceID string, relationshipType str
 	}
 
 	return devices, nil
-}
-
-// MigrateFromFileStorage migrates data from file-based storage to SQLite
-func (ss *SQLiteStorage) MigrateFromFileStorage(dataDir, format string) error {
-	ss.mu.Lock()
-	defer ss.mu.Unlock()
-
-	// Load devices from file-based storage using the standalone migration function
-	devices, err := MigrateFromFileStorage(dataDir, format)
-	if err != nil {
-		return fmt.Errorf("loading devices from file storage: %w", err)
-	}
-
-	// Import devices into SQLite
-	for _, device := range devices {
-		// Check if device already exists
-		var exists bool
-		err := ss.db.QueryRow("SELECT EXISTS(SELECT 1 FROM devices WHERE id = ?)", device.ID).Scan(&exists)
-		if err != nil {
-			return fmt.Errorf("checking device existence: %w", err)
-		}
-
-		if exists {
-			continue // Skip already imported devices
-		}
-
-		// Insert device
-		_, err = ss.db.Exec(`
-			INSERT INTO devices (id, name, description, make_model, os, datacenter_id, username, created_at, updated_at)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-		`, device.ID, device.Name, device.Description, device.MakeModel, device.OS, device.DatacenterID, device.Username,
-			device.CreatedAt, device.UpdatedAt)
-		if err != nil {
-			return fmt.Errorf("inserting device %s: %w", device.ID, err)
-		}
-
-		// Insert addresses
-		if err := ss.insertDeviceAddresses(nil, device.ID, device.Addresses); err != nil {
-			return fmt.Errorf("inserting addresses for %s: %w", device.ID, err)
-		}
-
-		// Insert tags
-		if err := ss.insertDeviceTags(nil, device.ID, device.Tags); err != nil {
-			return fmt.Errorf("inserting tags for %s: %w", device.ID, err)
-		}
-
-		// Insert domains
-		if err := ss.insertDeviceDomains(nil, device.ID, device.Domains); err != nil {
-			return fmt.Errorf("inserting domains for %s: %w", device.ID, err)
-		}
-	}
-
-	return nil
 }
 
 // Helper functions

@@ -15,16 +15,16 @@ import (
 
 // Server wraps the MCP server with device storage
 type Server struct {
-	mcpServer *mcp.Server
-	storage   storage.Storage
+	mcpServer   *mcp.Server
+	storage     storage.Storage
 	bearerToken string
 }
 
 // NewServer creates a new MCP server for device management
 func NewServer(storage storage.Storage, bearerToken string) *Server {
 	s := &Server{
-		mcpServer: mcp.NewServer("rackd", "1.0.0"),
-		storage:   storage,
+		mcpServer:   mcp.NewServer("rackd", "1.0.0"),
+		storage:     storage,
 		bearerToken: bearerToken,
 	}
 	s.registerTools()
@@ -88,7 +88,7 @@ func (s *Server) registerTools() {
 
 	// device_add_relationship - Add a relationship between two devices
 	s.mcpServer.RegisterTool(
-		mcp.NewTool("device_add_relationship", "Add a relationship between two devices (SQLite storage only). Common types: depends_on, connected_to, contains",
+		mcp.NewTool("device_add_relationship", "Add a relationship between two devices. Common types: depends_on, connected_to, contains",
 			mcp.String("parent_id", "Parent device ID or name", mcp.Required()),
 			mcp.String("child_id", "Child device ID or name", mcp.Required()),
 			mcp.String("relationship_type", "Type of relationship (e.g., depends_on, connected_to, contains)", mcp.Required()),
@@ -98,7 +98,7 @@ func (s *Server) registerTools() {
 
 	// device_get_relationships - Get all relationships for a device
 	s.mcpServer.RegisterTool(
-		mcp.NewTool("device_get_relationships", "Get all relationships for a device (SQLite storage only)",
+		mcp.NewTool("device_get_relationships", "Get all relationships for a device",
 			mcp.String("id", "Device ID or name", mcp.Required()),
 		),
 		s.handleGetRelationships,
@@ -106,7 +106,7 @@ func (s *Server) registerTools() {
 
 	// device_get_related - Get devices related to a device
 	s.mcpServer.RegisterTool(
-		mcp.NewTool("device_get_related", "Get devices related to a device (SQLite storage only)",
+		mcp.NewTool("device_get_related", "Get devices related to a device",
 			mcp.String("id", "Device ID or name", mcp.Required()),
 			mcp.String("relationship_type", "Filter by relationship type (optional, returns all types if not specified)"),
 		),
@@ -115,7 +115,7 @@ func (s *Server) registerTools() {
 
 	// device_remove_relationship - Remove a relationship between two devices
 	s.mcpServer.RegisterTool(
-		mcp.NewTool("device_remove_relationship", "Remove a relationship between two devices (SQLite storage only)",
+		mcp.NewTool("device_remove_relationship", "Remove a relationship between two devices",
 			mcp.String("parent_id", "Parent device ID or name", mcp.Required()),
 			mcp.String("child_id", "Child device ID or name", mcp.Required()),
 			mcp.String("relationship_type", "Type of relationship to remove", mcp.Required()),
@@ -154,7 +154,7 @@ func (s *Server) registerTools() {
 
 	// datacenter_delete - Delete a datacenter
 	s.mcpServer.RegisterTool(
-		mcp.NewTool("datacenter_delete", "Delete a datacenter from the inventory (SQLite storage only)",
+		mcp.NewTool("datacenter_delete", "Delete a datacenter from the inventory",
 			mcp.String("id", "Datacenter ID or name", mcp.Required()),
 		),
 		s.handleDatacenterDelete,
@@ -162,7 +162,7 @@ func (s *Server) registerTools() {
 
 	// datacenter_get_devices - Get devices in a datacenter
 	s.mcpServer.RegisterTool(
-		mcp.NewTool("datacenter_get_devices", "Get all devices located in a specific datacenter (SQLite storage only)",
+		mcp.NewTool("datacenter_get_devices", "Get all devices located in a specific datacenter",
 			mcp.String("id", "Datacenter ID or name", mcp.Required()),
 		),
 		s.handleDatacenterGetDevices,
@@ -189,7 +189,7 @@ func (s *Server) registerTools() {
 
 	// network_save - Create or update a network
 	s.mcpServer.RegisterTool(
-		mcp.NewTool("network_save", "Create a new network or update an existing one (SQLite storage only). If id is provided and exists, it updates; otherwise creates new.",
+		mcp.NewTool("network_save", "Create a new network or update an existing one. If id is provided and exists, it updates; otherwise creates new.",
 			mcp.String("id", "Network ID (if updating existing network)"),
 			mcp.String("name", "Network name", mcp.Required()),
 			mcp.String("subnet", "IP subnet in CIDR notation (e.g., 192.168.1.0/24)", mcp.Required()),
@@ -201,7 +201,7 @@ func (s *Server) registerTools() {
 
 	// network_delete - Delete a network
 	s.mcpServer.RegisterTool(
-		mcp.NewTool("network_delete", "Delete a network from the inventory (SQLite storage only)",
+		mcp.NewTool("network_delete", "Delete a network from the inventory",
 			mcp.String("id", "Network ID or name", mcp.Required()),
 		),
 		s.handleNetworkDelete,
@@ -209,7 +209,7 @@ func (s *Server) registerTools() {
 
 	// network_get_devices - Get devices on a network
 	s.mcpServer.RegisterTool(
-		mcp.NewTool("network_get_devices", "Get all devices with addresses on a specific network (SQLite storage only)",
+		mcp.NewTool("network_get_devices", "Get all devices with addresses on a specific network",
 			mcp.String("id", "Network ID or name", mcp.Required()),
 		),
 		s.handleNetworkGetDevices,
@@ -313,16 +313,16 @@ func (s *Server) handleDeviceSave(ctx context.Context, req *mcp.ToolRequest) (*m
 
 	// Create new device
 	device = &model.Device{
-		ID:          id, // Will be generated if empty by API layer, but we can set it here too
-		Name:        name,
-		Description: description,
-		MakeModel:   makeModel,
-		OS:          os,
+		ID:           id, // Will be generated if empty by API layer, but we can set it here too
+		Name:         name,
+		Description:  description,
+		MakeModel:    makeModel,
+		OS:           os,
 		DatacenterID: datacenterID,
-		Username:    username,
-		Tags:        tags,
-		Domains:     domains,
-		Addresses:   addresses,
+		Username:     username,
+		Tags:         tags,
+		Domains:      domains,
+		Addresses:    addresses,
 	}
 
 	// Generate ID if not provided
@@ -682,10 +682,10 @@ func (s *Server) handleNetworkSave(ctx context.Context, req *mcp.ToolRequest) (*
 
 	// Create new network
 	network = &model.Network{
-		Name:        name,
-		Subnet:      subnet,
+		Name:         name,
+		Subnet:       subnet,
 		DatacenterID: datacenterID,
-		Description: description,
+		Description:  description,
 	}
 
 	if err := netStorage.CreateNetwork(network); err != nil {

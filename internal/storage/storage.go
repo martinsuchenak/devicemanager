@@ -2,9 +2,6 @@ package storage
 
 import (
 	"errors"
-	"os"
-	"path/filepath"
-	"strings"
 
 	"github.com/martinsuchenak/rackd/internal/model"
 )
@@ -68,56 +65,4 @@ type Storage interface {
 type ExtendedStorage interface {
 	Storage
 	RelationshipStorage
-}
-
-// MigrateFromFileStorage is kept for backward compatibility during migration
-// It reads devices from old file-based storage and returns them
-func MigrateFromFileStorage(dataDir, format string) ([]model.Device, error) {
-	if format != "json" && format != "toml" {
-		format = "json"
-	}
-
-	entries, err := os.ReadDir(dataDir)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return []model.Device{}, nil
-		}
-		return nil, err
-	}
-
-	var devices []model.Device
-	ext := "." + format
-
-	for _, entry := range entries {
-		if entry.IsDir() {
-			continue
-		}
-
-		if !strings.HasSuffix(entry.Name(), ext) {
-			continue
-		}
-
-		var device model.Device
-		filePath := filepath.Join(dataDir, entry.Name())
-		file, err := os.Open(filePath)
-		if err != nil {
-			return nil, err
-		}
-
-		switch format {
-		case "json":
-			err = loadJSON(file, &device)
-		case "toml":
-			err = loadTOML(file, &device)
-		}
-		file.Close()
-
-		if err != nil {
-			return nil, err
-		}
-
-		devices = append(devices, device)
-	}
-
-	return devices, nil
 }

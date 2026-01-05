@@ -104,7 +104,11 @@ func (ss *SQLiteStorage) MigrateToV2() error {
 
 		// Create datacenter entries from unique locations
 		for _, location := range locations {
-			dcID := uuid.New().String()
+			u, err := uuid.NewV7()
+			if err != nil {
+				return fmt.Errorf("generating UUIDv7 for datacenter: %w", err)
+			}
+			dcID := u.String()
 			_, err = tx.Exec(`
 				INSERT INTO datacenters (id, name, location, description, created_at, updated_at)
 				VALUES (?, ?, '', '', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
@@ -461,6 +465,118 @@ func (ss *SQLiteStorage) MigrateToV5() error {
 
 	// Update migration version
 	_, err = tx.Exec(`INSERT OR IGNORE INTO schema_migrations (version) VALUES (5)`)
+	if err != nil {
+		return fmt.Errorf("setting migration version: %w", err)
+	}
+
+	return tx.Commit()
+}
+
+// MigrateToV6 migrates from schema v5 to v6 (UUID for device IDs)
+// - Converts existing name-based device IDs to UUIDv7
+// - Updates references in all related tables
+func (ss *SQLiteStorage) MigrateToV6() error {
+	// Check if already migrated - also handles case where table doesn't exist
+	var version int
+	err := ss.db.QueryRow("SELECT COALESCE(MAX(version), 0) FROM schema_migrations").Scan(&version)
+	if err != nil {
+		// Table doesn't exist or other error - treat as version 0
+		version = 0
+	}
+	if version >= 6 {
+		return nil // Already migrated
+	}
+
+	tx, err := ss.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	// Defer foreign key checks so we can update IDs
+	_, err = tx.Exec("PRAGMA defer_foreign_keys = ON")
+	if err != nil {
+		return fmt.Errorf("deferring foreign keys: %w", err)
+	}
+
+	// Get all device IDs
+	rows, err := tx.Query("SELECT id FROM devices")
+	if err != nil {
+		return fmt.Errorf("querying devices: %w", err)
+	}
+	
+	var idsToMigrate []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			rows.Close()
+			return fmt.Errorf("scanning device id: %w", err)
+		}
+		// Check if it's already a valid UUID
+		if _, err := uuid.Parse(id); err != nil {
+			idsToMigrate = append(idsToMigrate, id)
+		}
+	}
+	rows.Close()
+
+	// Migrate each non-UUID device
+	for _, oldID := range idsToMigrate {
+		u, err := uuid.NewV7()
+		if err != nil {
+			return fmt.Errorf("generating UUIDv7 for device: %w", err)
+		}
+		newID := u.String()
+
+		// Update devices table
+		_, err = tx.Exec("UPDATE devices SET id = ? WHERE id = ?", newID, oldID)
+		if err != nil {
+			return fmt.Errorf("updating device id %s to %s: %w", oldID, newID, err)
+		}
+
+		// Update addresses
+		_, err = tx.Exec("UPDATE addresses SET device_id = ? WHERE device_id = ?", newID, oldID)
+		if err != nil {
+			return fmt.Errorf("updating addresses for device %s: %w", oldID, err)
+		}
+
+		// Update tags
+		_, err = tx.Exec("UPDATE tags SET device_id = ? WHERE device_id = ?", newID, oldID)
+		if err != nil {
+			return fmt.Errorf("updating tags for device %s: %w", oldID, err)
+		}
+
+		// Update domains
+		_, err = tx.Exec("UPDATE domains SET device_id = ? WHERE device_id = ?", newID, oldID)
+		if err != nil {
+			return fmt.Errorf("updating domains for device %s: %w", oldID, err)
+		}
+
+		// Update device_relationships (parent)
+		_, err = tx.Exec("UPDATE device_relationships SET parent_id = ? WHERE parent_id = ?", newID, oldID)
+		if err != nil {
+			return fmt.Errorf("updating relationships parent for device %s: %w", oldID, err)
+		}
+
+		// Update device_relationships (child)
+		_, err = tx.Exec("UPDATE device_relationships SET child_id = ? WHERE child_id = ?", newID, oldID)
+		if err != nil {
+			return fmt.Errorf("updating relationships child for device %s: %w", oldID, err)
+		}
+	}
+
+	// Ensure schema_migrations table exists
+	_, err = tx.Exec(`
+		CREATE TABLE IF NOT EXISTS schema_migrations (
+			version INTEGER PRIMARY KEY,
+			applied_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+		)
+	`)
+	if err != nil {
+		return fmt.Errorf("creating migrations table: %w", err)
+	}
+
+	// Update migration version
+	_, err = tx.Exec(`INSERT OR IGNORE INTO schema_migrations (version) VALUES (6)`)
 	if err != nil {
 		return fmt.Errorf("setting migration version: %w", err)
 	}
