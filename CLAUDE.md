@@ -2,6 +2,8 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+**IMPORTANT:** When making API changes, also see `AGENTS.md` for critical requirements about updating the OpenAPI specification.
+
 ## Project Overview
 
 Rackd is a Go-based device tracking and management application for datacenter assets. It provides multiple interfaces: a RESTful API, CLI tool, embedded web UI, and an MCP (Model Context Protocol) server for AI agent integration.

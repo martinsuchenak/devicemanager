@@ -584,6 +584,67 @@ func (ss *SQLiteStorage) MigrateToV6() error {
 	return tx.Commit()
 }
 
+// MigrateToV7 migrates from schema v6 to v7 (location field for devices)
+// - Adds location column to devices table
+func (ss *SQLiteStorage) MigrateToV7() error {
+	// Check if already migrated - also handles case where table doesn't exist
+	var version int
+	err := ss.db.QueryRow("SELECT COALESCE(MAX(version), 0) FROM schema_migrations").Scan(&version)
+	if err != nil {
+		// Table doesn't exist or other error - treat as version 0
+		version = 0
+	}
+	if version >= 7 {
+		return nil // Already migrated
+	}
+
+	tx, err := ss.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	// Check if devices table has the location column
+	var locationColumn string
+	err = tx.QueryRow(`
+		SELECT name FROM pragma_table_info('devices')
+		WHERE name='location'
+	`).Scan(&locationColumn)
+
+	if err == sql.ErrNoRows {
+		// Column doesn't exist - add it
+		_, err = tx.Exec(`ALTER TABLE devices ADD COLUMN location TEXT`)
+		if err != nil {
+			return fmt.Errorf("adding location column: %w", err)
+		}
+
+		// Create index for location
+		_, err = tx.Exec(`CREATE INDEX IF NOT EXISTS idx_devices_location ON devices(location)`)
+		if err != nil {
+			return fmt.Errorf("creating devices location index: %w", err)
+		}
+	}
+
+	// Ensure schema_migrations table exists
+	_, err = tx.Exec(`
+		CREATE TABLE IF NOT EXISTS schema_migrations (
+			version INTEGER PRIMARY KEY,
+			applied_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+		)
+	`)
+	if err != nil {
+		return fmt.Errorf("creating migrations table: %w", err)
+	}
+
+	// Update migration version
+	_, err = tx.Exec(`INSERT OR IGNORE INTO schema_migrations (version) VALUES (7)`)
+	if err != nil {
+		return fmt.Errorf("setting migration version: %w", err)
+	}
+
+	return tx.Commit()
+}
+
 // isDuplicateColumnError checks if the error is about duplicate column
 func isDuplicateColumnError(err error) bool {
 	return err != nil && (err.Error() == "duplicate column name: datacenter_id" ||

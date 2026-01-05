@@ -80,6 +80,7 @@ func addCommand() *cli.Command {
 			&cli.StringFlag{Name: "make-model", Usage: "Make and model"},
 			&cli.StringFlag{Name: "os", Usage: "Operating system"},
 			&cli.StringFlag{Name: "datacenter-id", Usage: "Datacenter ID"},
+			&cli.StringFlag{Name: "location", Usage: "Device location (e.g., rack, office)"},
 			&cli.StringFlag{Name: "tags", Usage: "Comma-separated tags"},
 			&cli.StringFlag{Name: "domains", Usage: "Comma-separated domains"},
 		},
@@ -90,6 +91,7 @@ func addCommand() *cli.Command {
 				MakeModel:    cmd.GetString("make-model"),
 				OS:           cmd.GetString("os"),
 				DatacenterID: cmd.GetString("datacenter-id"),
+				Location:     cmd.GetString("location"),
 				Tags:         parseTags(cmd.GetString("tags")),
 				Domains:      parseList(cmd.GetString("domains")),
 			}
@@ -151,6 +153,7 @@ func updateCommand() *cli.Command {
 			&cli.StringFlag{Name: "make-model", Usage: "Make and model"},
 			&cli.StringFlag{Name: "os", Usage: "Operating system"},
 			&cli.StringFlag{Name: "datacenter-id", Usage: "Datacenter ID"},
+			&cli.StringFlag{Name: "location", Usage: "Device location (e.g., rack, office)"},
 			&cli.StringFlag{Name: "tags", Usage: "Comma-separated tags"},
 			&cli.StringFlag{Name: "domains", Usage: "Comma-separated domains"},
 		},
@@ -162,6 +165,7 @@ func updateCommand() *cli.Command {
 				MakeModel:    cmd.GetString("make-model"),
 				OS:           cmd.GetString("os"),
 				DatacenterID: cmd.GetString("datacenter-id"),
+				Location:     cmd.GetString("location"),
 				Tags:         parseTags(cmd.GetString("tags")),
 				Domains:      parseList(cmd.GetString("domains")),
 			}
@@ -258,6 +262,9 @@ func updateLocal(id string, updates *model.Device) error {
 	}
 	if updates.DatacenterID != "" {
 		device.DatacenterID = updates.DatacenterID
+	}
+	if updates.Location != "" {
+		device.Location = updates.Location
 	}
 	if updates.Tags != nil {
 		device.Tags = updates.Tags
@@ -472,6 +479,7 @@ func printDevice(device *model.Device) {
 	fmt.Printf("Make/Model:   %s\n", device.MakeModel)
 	fmt.Printf("OS:           %s\n", device.OS)
 	fmt.Printf("Datacenter:   %s\n", device.DatacenterID)
+	fmt.Printf("Location:     %s\n", device.Location)
 	fmt.Printf("Tags:         %s\n", strings.Join(device.Tags, ", "))
 	fmt.Printf("Domains:      %s\n", strings.Join(device.Domains, ", "))
 	fmt.Println("Addresses:")

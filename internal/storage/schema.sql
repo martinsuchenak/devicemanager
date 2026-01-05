@@ -39,6 +39,7 @@ CREATE TABLE IF NOT EXISTS devices (
     os TEXT,
     datacenter_id TEXT,
     username TEXT,
+    location TEXT,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (datacenter_id) REFERENCES datacenters(id) ON DELETE SET NULL
@@ -46,6 +47,8 @@ CREATE TABLE IF NOT EXISTS devices (
 
 -- Create index on device name for fast lookups
 CREATE INDEX IF NOT EXISTS idx_devices_name ON devices(name);
+-- Create index on device location for fast lookups
+CREATE INDEX IF NOT EXISTS idx_devices_location ON devices(location);
 
 -- Addresses table (one-to-many with devices)
 CREATE TABLE IF NOT EXISTS addresses (

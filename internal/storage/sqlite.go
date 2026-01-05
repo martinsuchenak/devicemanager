@@ -137,6 +137,10 @@ func (ss *SQLiteStorage) initSchema() error {
 		return fmt.Errorf("running MigrateToV6: %w", err)
 	}
 
+	if err := ss.MigrateToV7(); err != nil {
+		return fmt.Errorf("running MigrateToV7: %w", err)
+	}
+
 	return nil
 }
 
@@ -151,7 +155,7 @@ func (ss *SQLiteStorage) ListDevices(filter *model.DeviceFilter) ([]model.Device
 	defer ss.mu.RUnlock()
 
 	query := `
-		SELECT d.id, d.name, d.description, d.make_model, d.os, d.datacenter_id, d.username,
+		SELECT d.id, d.name, d.description, d.make_model, d.os, d.datacenter_id, d.username, d.location,
 		       d.created_at, d.updated_at
 		FROM devices d
 		ORDER BY d.name
@@ -190,7 +194,7 @@ func (ss *SQLiteStorage) GetDevice(id string) (*model.Device, error) {
 
 	// Try ID lookup first
 	query := `
-		SELECT d.id, d.name, d.description, d.make_model, d.os, d.datacenter_id, d.username,
+		SELECT d.id, d.name, d.description, d.make_model, d.os, d.datacenter_id, d.username, d.location,
 		       d.created_at, d.updated_at
 		FROM devices d
 		WHERE d.id = ?
@@ -207,7 +211,7 @@ func (ss *SQLiteStorage) GetDevice(id string) (*model.Device, error) {
 
 	// Try name lookup
 	query = `
-		SELECT d.id, d.name, d.description, d.make_model, d.os, d.datacenter_id, d.username,
+		SELECT d.id, d.name, d.description, d.make_model, d.os, d.datacenter_id, d.username, d.location,
 		       d.created_at, d.updated_at
 		FROM devices d
 		WHERE LOWER(d.name) = LOWER(?)
@@ -259,10 +263,17 @@ func (ss *SQLiteStorage) CreateDevice(device *model.Device) error {
 		usernameValue = device.Username
 	}
 
+	var locationValue interface{}
+	if device.Location == "" {
+		locationValue = nil
+	} else {
+		locationValue = device.Location
+	}
+
 	_, err = tx.Exec(`
-		INSERT INTO devices (id, name, description, make_model, os, datacenter_id, username, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-	`, device.ID, device.Name, device.Description, device.MakeModel, device.OS, datacenterIDValue, usernameValue,
+		INSERT INTO devices (id, name, description, make_model, os, datacenter_id, username, location, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`, device.ID, device.Name, device.Description, device.MakeModel, device.OS, datacenterIDValue, usernameValue, locationValue,
 		device.CreatedAt, device.UpdatedAt)
 	if err != nil {
 		return fmt.Errorf("inserting device: %w", err)
@@ -314,11 +325,18 @@ func (ss *SQLiteStorage) UpdateDevice(device *model.Device) error {
 		usernameValue = device.Username
 	}
 
+	var locationValue interface{}
+	if device.Location == "" {
+		locationValue = nil
+	} else {
+		locationValue = device.Location
+	}
+
 	result, err := tx.Exec(`
 		UPDATE devices
-		SET name = ?, description = ?, make_model = ?, os = ?, datacenter_id = ?, username = ?, updated_at = ?
+		SET name = ?, description = ?, make_model = ?, os = ?, datacenter_id = ?, username = ?, location = ?, updated_at = ?
 		WHERE id = ?
-	`, device.Name, device.Description, device.MakeModel, device.OS, datacenterIDValue, usernameValue,
+	`, device.Name, device.Description, device.MakeModel, device.OS, datacenterIDValue, usernameValue, locationValue,
 		device.UpdatedAt, device.ID)
 	if err != nil {
 		return fmt.Errorf("updating device: %w", err)
@@ -387,11 +405,11 @@ func (ss *SQLiteStorage) SearchDevices(query string) ([]model.Device, error) {
 
 	// Search in device fields
 	sqlQuery := `
-		SELECT DISTINCT d.id, d.name, d.description, d.make_model, d.os, d.datacenter_id, d.network_id,
+		SELECT DISTINCT d.id, d.name, d.description, d.make_model, d.os, d.datacenter_id, d.username, d.location,
 		       d.created_at, d.updated_at
 		FROM devices d
 		WHERE LOWER(d.name) LIKE ? OR LOWER(d.description) LIKE ?
-		   OR LOWER(d.make_model) LIKE ? OR LOWER(d.os) LIKE ? OR LOWER(d.datacenter_id) LIKE ?
+		   OR LOWER(d.make_model) LIKE ? OR LOWER(d.os) LIKE ? OR LOWER(d.location) LIKE ?
 		ORDER BY d.name
 	`
 
@@ -409,7 +427,7 @@ func (ss *SQLiteStorage) SearchDevices(query string) ([]model.Device, error) {
 
 	// Search in tags
 	tagRows, err := ss.db.Query(`
-		SELECT DISTINCT d.id, d.name, d.description, d.make_model, d.os, d.datacenter_id, d.network_id,
+		SELECT DISTINCT d.id, d.name, d.description, d.make_model, d.os, d.datacenter_id, d.username, d.location,
 		       d.created_at, d.updated_at
 		FROM devices d
 		INNER JOIN tags t ON d.id = t.device_id
@@ -426,7 +444,7 @@ func (ss *SQLiteStorage) SearchDevices(query string) ([]model.Device, error) {
 
 	// Search in domains
 	domainRows, err := ss.db.Query(`
-		SELECT DISTINCT d.id, d.name, d.description, d.make_model, d.os, d.datacenter_id, d.network_id,
+		SELECT DISTINCT d.id, d.name, d.description, d.make_model, d.os, d.datacenter_id, d.username, d.location,
 		       d.created_at, d.updated_at
 		FROM devices d
 		INNER JOIN domains dm ON d.id = dm.device_id
@@ -443,7 +461,7 @@ func (ss *SQLiteStorage) SearchDevices(query string) ([]model.Device, error) {
 
 	// Search in addresses
 	addrRows, err := ss.db.Query(`
-		SELECT DISTINCT d.id, d.name, d.description, d.make_model, d.os, d.datacenter_id, d.network_id,
+		SELECT DISTINCT d.id, d.name, d.description, d.make_model, d.os, d.datacenter_id, d.username, d.location,
 		       d.created_at, d.updated_at
 		FROM devices d
 		INNER JOIN addresses a ON d.id = a.device_id
@@ -545,7 +563,7 @@ func (ss *SQLiteStorage) GetRelatedDevices(deviceID string, relationshipType str
 	defer ss.mu.RUnlock()
 
 	query := `
-		SELECT DISTINCT d.id, d.name, d.description, d.make_model, d.os, d.datacenter_id, d.network_id,
+		SELECT DISTINCT d.id, d.name, d.description, d.make_model, d.os, d.datacenter_id, d.username, d.location,
 		       d.created_at, d.updated_at
 		FROM devices d
 		INNER JOIN device_relationships dr ON (d.id = dr.parent_id OR d.id = dr.child_id)
@@ -606,9 +624,9 @@ func (ss *SQLiteStorage) MigrateFromFileStorage(dataDir, format string) error {
 
 		// Insert device
 		_, err = ss.db.Exec(`
-			INSERT INTO devices (id, name, description, make_model, os, datacenter_id, username, created_at, updated_at)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-		`, device.ID, device.Name, device.Description, device.MakeModel, device.OS, device.DatacenterID, device.Username,
+			INSERT INTO devices (id, name, description, make_model, os, datacenter_id, username, location, created_at, updated_at)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		`, device.ID, device.Name, device.Description, device.MakeModel, device.OS, device.DatacenterID, device.Username, device.Location,
 			device.CreatedAt, device.UpdatedAt)
 		if err != nil {
 			return fmt.Errorf("inserting device %s: %w", device.ID, err)
@@ -665,7 +683,8 @@ func (ss *SQLiteStorage) scanDevices(rows *sql.Rows) ([]model.Device, error) {
 		var d model.Device
 		var datacenterID sql.NullString
 		var username sql.NullString
-		err := rows.Scan(&d.ID, &d.Name, &d.Description, &d.MakeModel, &d.OS, &datacenterID, &username,
+		var location sql.NullString
+		err := rows.Scan(&d.ID, &d.Name, &d.Description, &d.MakeModel, &d.OS, &datacenterID, &username, &location,
 			&d.CreatedAt, &d.UpdatedAt)
 		if err != nil {
 			return nil, fmt.Errorf("scanning device: %w", err)
@@ -679,6 +698,11 @@ func (ss *SQLiteStorage) scanDevices(rows *sql.Rows) ([]model.Device, error) {
 			d.Username = username.String
 		} else {
 			d.Username = ""
+		}
+		if location.Valid {
+			d.Location = location.String
+		} else {
+			d.Location = ""
 		}
 		devices = append(devices, d)
 	}
@@ -1120,7 +1144,7 @@ func (ss *SQLiteStorage) GetDatacenterDevices(datacenterID string) ([]model.Devi
 	defer ss.mu.RUnlock()
 
 	query := `
-		SELECT d.id, d.name, d.description, d.make_model, d.os, d.datacenter_id, d.username,
+		SELECT d.id, d.name, d.description, d.make_model, d.os, d.datacenter_id, d.username, d.location,
 		       d.created_at, d.updated_at
 		FROM devices d
 		WHERE d.datacenter_id = ?
@@ -1329,7 +1353,7 @@ func (ss *SQLiteStorage) GetNetworkDevices(networkID string) ([]model.Device, er
 	defer ss.mu.RUnlock()
 
 	query := `
-		SELECT d.id, d.name, d.description, d.make_model, d.os, d.datacenter_id, d.username,
+		SELECT d.id, d.name, d.description, d.make_model, d.os, d.datacenter_id, d.username, d.location,
 		       d.created_at, d.updated_at
 		FROM devices d
 		WHERE d.network_id = ?

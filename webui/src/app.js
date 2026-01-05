@@ -378,7 +378,7 @@ Alpine.data('deviceManager', () => ({
     currentDevice: {},
     form: {
         id: '', name: '', description: '', make_model: '', os: '',
-        datacenter_id: '', username: '', tagsInput: '', domainsInput: '',
+        datacenter_id: '', username: '', location: '', tagsInput: '', domainsInput: '',
         addresses: []
     },
 
@@ -490,7 +490,7 @@ Alpine.data('deviceManager', () => ({
     resetForm() {
         this.form = {
             id: '', name: '', description: '', make_model: '', os: '',
-            datacenter_id: '', username: '', tagsInput: '', domainsInput: '',
+            datacenter_id: '', username: '', location: '', tagsInput: '', domainsInput: '',
             addresses: [{ ip: '', port: '', type: 'ipv4', label: '', network_id: '', switch_port: '' }]
         };
     },
@@ -527,6 +527,7 @@ Alpine.data('deviceManager', () => ({
                 os: this.form.os || '',
                 datacenter_id: this.form.datacenter_id || '',
                 username: this.form.username || '',
+                location: this.form.location || '',
                 tags: this.form.tagsInput.split(',').map(t => t.trim()).filter(t => t),
                 domains: this.form.domainsInput.split(',').map(t => t.trim()).filter(t => t),
                 addresses: addresses
@@ -604,6 +605,7 @@ Alpine.data('deviceManager', () => ({
             os: device.os || '',
             datacenter_id: device.datacenter_id || '',
             username: device.username || '',
+            location: device.location || '',
             tagsInput: (device.tags || []).join(', '),
             domainsInput: (device.domains || []).join(', '),
             addresses: device.addresses && device.addresses.length > 0

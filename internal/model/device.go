@@ -13,6 +13,7 @@ type Device struct {
 	OS          string    `json:"os" toml:"os"`
 	DatacenterID string   `json:"datacenter_id,omitempty" toml:"datacenter_id,omitempty"`
 	Username    string    `json:"username,omitempty" toml:"username,omitempty"`
+	Location    string    `json:"location,omitempty" toml:"location,omitempty"`
 	Tags        []string  `json:"tags" toml:"tags"`
 	Addresses   []Address `json:"addresses" toml:"addresses"`
 	Domains     []string  `json:"domains" toml:"domains"`

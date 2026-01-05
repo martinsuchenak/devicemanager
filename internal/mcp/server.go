@@ -45,6 +45,7 @@ func (s *Server) registerTools() {
 			mcp.String("os", "Operating system"),
 			mcp.String("datacenter_id", "Datacenter ID"),
 			mcp.String("username", "Username for SSH/login access"),
+			mcp.String("location", "Device location (e.g., rack, office)"),
 			mcp.StringArray("tags", "Tags for categorization"),
 			mcp.StringArray("domains", "Domain names associated with device"),
 			mcp.ObjectArray("addresses", "Network addresses",
@@ -267,6 +268,7 @@ func (s *Server) handleDeviceSave(ctx context.Context, req *mcp.ToolRequest) (*m
 	os := req.StringOr("os", "")
 	datacenterID := req.StringOr("datacenter_id", "")
 	username := req.StringOr("username", "")
+	location := req.StringOr("location", "")
 
 	tags, _ := req.StringSlice("tags")
 	domains, _ := req.StringSlice("domains")
@@ -294,6 +296,9 @@ func (s *Server) handleDeviceSave(ctx context.Context, req *mcp.ToolRequest) (*m
 		if username != "" {
 			device.Username = username
 		}
+		if location != "" {
+			device.Location = location
+		}
 		if tags != nil {
 			device.Tags = tags
 		}
@@ -320,6 +325,7 @@ func (s *Server) handleDeviceSave(ctx context.Context, req *mcp.ToolRequest) (*m
 		OS:          os,
 		DatacenterID: datacenterID,
 		Username:    username,
+		Location:    location,
 		Tags:        tags,
 		Domains:     domains,
 		Addresses:   addresses,
@@ -1005,6 +1011,9 @@ func (s *Server) formatDeviceSummary(device *model.Device) string {
 	}
 	if device.Username != "" {
 		result.WriteString(fmt.Sprintf("Username: %s\n", device.Username))
+	}
+	if device.Location != "" {
+		result.WriteString(fmt.Sprintf("Location: %s\n", device.Location))
 	}
 	if len(device.Tags) > 0 {
 		result.WriteString(fmt.Sprintf("Tags: %s\n", strings.Join(device.Tags, ", ")))

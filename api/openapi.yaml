@@ -82,6 +82,7 @@ paths:
                       os: Ubuntu 22.04
                       datacenter_id: "01915fdc-8d4f-7126-83d6-9c5b00f00e01"
                       username: admin
+                      location: "Rack A-1"
                       tags: [server, production, web]
                       domains: [example.com]
                       addresses:
@@ -122,6 +123,7 @@ paths:
                   os: FortiOS 7.2
                   datacenter_id: "01915fdc-8d4f-7126-83d6-9c5b00f00e01"
                   username: admin
+                  location: "Rack B-2"
                   tags: [network, security, edge]
                   domains: [example.com]
                   addresses:
@@ -747,7 +749,7 @@ paths:
       summary: Search devices
       description: |
         Search for devices by name, IP address, tags, domains, datacenter,
-        make/model, OS, or description. The search is case-insensitive
+        make/model, OS, location, or description. The search is case-insensitive
         and matches partial strings.
       operationId: searchDevices
       tags:
@@ -1039,6 +1041,10 @@ components:
           type: string
           description: Username for SSH/login access
           example: admin
+        location:
+          type: string
+          description: Device location (e.g., rack position, office)
+          example: Rack A-1, Room 302
         tags:
           type: array
           description: Tags for categorization and filtering
@@ -1092,6 +1098,9 @@ components:
         username:
           type: string
           description: Username for SSH/login access
+        location:
+          type: string
+          description: Device location (e.g., rack position, office)
         tags:
           type: array
           description: Tags for categorization and filtering
