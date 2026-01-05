@@ -133,6 +133,10 @@ func (ss *SQLiteStorage) initSchema() error {
 		return fmt.Errorf("running MigrateToV5: %w", err)
 	}
 
+	if err := ss.MigrateToV6(); err != nil {
+		return fmt.Errorf("running MigrateToV6: %w", err)
+	}
+
 	return nil
 }
 

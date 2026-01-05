@@ -238,10 +238,9 @@ func (h *Handler) internalError(w http.ResponseWriter, err error) {
 	h.writeError(w, http.StatusInternalServerError, "Internal Server Error")
 }
 
-// generateID generates a simple ID from a name
+// generateID generates a UUIDv7 for a device
 func generateID(name string) string {
-	// Simple ID generation - could use UUID in production
-	return strings.ToLower(strings.ReplaceAll(strings.TrimSpace(name), " ", "-")) + "-" + time.Now().Format("20060102150405")
+	return uuid.New().String()
 }
 
 // StaticFileHandler serves static files (for the web UI)
