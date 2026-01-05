@@ -168,6 +168,7 @@
             <div x-show="showModal" class="fixed inset-0 z-50 overflow-y-auto" role="dialog" aria-modal="true" x-trap.noscroll="showModal">
                 <div class="flex min-h-screen items-center justify-center p-4">
                     <div x-show="showModal" class="fixed inset-0 bg-gray-900/20 backdrop-blur-sm transition-opacity dark:bg-gray-900/50" @click="closeModal()"></div>
+                    <template x-if="showModal">
                     <div class="relative z-10 w-full max-w-lg bg-white rounded-lg shadow-xl dark:bg-gray-800">
                         <!-- Header -->
                         <div class="flex items-center justify-between border-b border-gray-200 px-6 py-4 dark:border-gray-700">
@@ -254,6 +255,7 @@
                             <button @click="closeModal()" class="flex-1 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-200">Cancel</button>
                         </div>
                     </div>
+                    </template>
                 </div>
             </div>
             
