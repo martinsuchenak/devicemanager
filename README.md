@@ -18,7 +18,7 @@ A Go-based device tracking application with MCP server support, web UI, and CLI.
 
 ### Prerequisites
 
-- **Go 1.23+** for building the server and CLI
+- **Go 1.25+** for building the server and CLI
 - **bun** (for building web UI assets - only required for development)
 
 ### Building
@@ -34,6 +34,7 @@ make cli         # Build CLI binary
 ```
 
 The build process automatically:
+
 1. Installs UI dependencies with bun
 2. Builds Tailwind CSS and bundles JavaScript
 3. Embeds UI assets into the Go binary
@@ -50,6 +51,7 @@ make run-server
 ```
 
 The server will start on `http://localhost:8080`:
+
 - Web UI: http://localhost:8080
 - API: http://localhost:8080/api/
 - MCP: http://localhost:8080/mcp
@@ -128,6 +130,7 @@ export RACKD_LISTEN_ADDR=:8080
 ### Storage
 
 Rackd uses SQLite for storage with the following benefits:
+
 - Better performance for large datasets
 - ACID transactions
 - Device relationship support
@@ -159,6 +162,7 @@ storage.RemoveRelationship("device-a-id", "device-b-id", "depends_on")
 ```
 
 Supported relationship types:
+
 - `depends_on` - Device depends on another device
 - `connected_to` - Physical or logical connection
 - `contains` - Parent/child containment (e.g., chassis contains blade)
@@ -207,17 +211,20 @@ make cli
 ### Devices
 
 #### List Devices
+
 ```bash
 GET /api/devices
 GET /api/devices?tag=server&tag=production
 ```
 
 #### Get Device
+
 ```bash
 GET /api/devices/{id}
 ```
 
 #### Create Device
+
 ```bash
 POST /api/devices
 Content-Type: application/json
@@ -229,6 +236,7 @@ Content-Type: application/json
   "os": "Ubuntu 22.04",
   "datacenter_id": "dc-123",
   "username": "admin",
+  "location": "Rack 12B",
   "tags": ["server", "production", "web"],
   "domains": ["example.com"],
   "addresses": [
@@ -245,6 +253,7 @@ Content-Type: application/json
 ```
 
 #### Update Device
+
 ```bash
 PUT /api/devices/{id}
 Content-Type: application/json
@@ -256,11 +265,13 @@ Content-Type: application/json
 ```
 
 #### Delete Device
+
 ```bash
 DELETE /api/devices/{id}
 ```
 
 #### Search Devices
+
 ```bash
 GET /api/search?q=dell
 ```
@@ -268,16 +279,19 @@ GET /api/search?q=dell
 ### Datacenters
 
 #### List Datacenters
+
 ```bash
 GET /api/datacenters
 ```
 
 #### Get Datacenter
+
 ```bash
 GET /api/datacenters/{id}
 ```
 
 #### Create Datacenter
+
 ```bash
 POST /api/datacenters
 Content-Type: application/json
@@ -290,6 +304,7 @@ Content-Type: application/json
 ```
 
 #### Update Datacenter
+
 ```bash
 PUT /api/datacenters/{id}
 Content-Type: application/json
@@ -302,6 +317,7 @@ Content-Type: application/json
 ```
 
 #### Delete Datacenter
+
 ```bash
 DELETE /api/datacenters/{id}
 ```
@@ -309,6 +325,7 @@ DELETE /api/datacenters/{id}
 Note: Deleting a datacenter will remove the datacenter reference from all devices (devices are not deleted).
 
 #### Get Datacenter Devices
+
 ```bash
 GET /api/datacenters/{id}/devices
 ```
@@ -316,6 +333,7 @@ GET /api/datacenters/{id}/devices
 ### Networks (SQLite only)
 
 #### List Networks
+
 ```bash
 GET /api/networks
 GET /api/networks?name=production
@@ -323,11 +341,13 @@ GET /api/networks?datacenter_id=dc-123
 ```
 
 #### Get Network
+
 ```bash
 GET /api/networks/{id}
 ```
 
 #### Create Network
+
 ```bash
 POST /api/networks
 Content-Type: application/json
@@ -341,6 +361,7 @@ Content-Type: application/json
 ```
 
 #### Update Network
+
 ```bash
 PUT /api/networks/{id}
 Content-Type: application/json
@@ -353,11 +374,13 @@ Content-Type: application/json
 ```
 
 #### Delete Network
+
 ```bash
 DELETE /api/networks/{id}
 ```
 
 #### Get Network Devices
+
 ```bash
 GET /api/networks/{id}/devices
 ```
@@ -367,6 +390,7 @@ Returns all devices that have addresses belonging to this network.
 ### Relationships (SQLite only)
 
 #### Add Relationship
+
 ```bash
 POST /api/devices/{id}/relationships
 Content-Type: application/json
@@ -378,6 +402,7 @@ Content-Type: application/json
 ```
 
 #### Get Relationships for a Device
+
 ```bash
 GET /api/devices/{id}/relationships
 ```
@@ -395,6 +420,7 @@ Returns:
 ```
 
 #### Get Related Devices
+
 ```bash
 GET /api/devices/{id}/related?type=depends_on
 ```
@@ -402,6 +428,7 @@ GET /api/devices/{id}/related?type=depends_on
 The `type` parameter is optional - if omitted, returns all related devices.
 
 #### Remove Relationship
+
 ```bash
 DELETE /api/devices/{parent_id}/relationships/{child_id}/{relationship_type}
 ```
@@ -500,6 +527,7 @@ type Device struct {
     OS           string       `json:"os"`
     DatacenterID string       `json:"datacenter_id"`
     Username     string       `json:"username"`
+    Location     string       `json:"location"`
     Tags         []string     `json:"tags"`
     Addresses    []Address    `json:"addresses"`
     Domains      []string     `json:"domains"`
@@ -539,6 +567,7 @@ type Address struct {
 ## Web UI
 
 The web UI is built with:
+
 - **Alpine.js** v3.15.3 - Reactive JavaScript framework
 - **Tailwind CSS** v4.1.18 - Utility-first CSS framework
 - **Dark mode** - Automatically follows your OS theme preference
