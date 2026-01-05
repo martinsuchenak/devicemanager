@@ -52,9 +52,9 @@ make run-server
 
 The server will start on `http://localhost:8080`:
 
-- Web UI: http://localhost:8080
-- API: http://localhost:8080/api/
-- MCP: http://localhost:8080/mcp
+- Web UI: <http://localhost:8080>
+- API: <http://localhost:8080/api/>
+- MCP: <http://localhost:8080/mcp>
 
 ### Docker
 
@@ -330,7 +330,7 @@ Note: Deleting a datacenter will remove the datacenter reference from all device
 GET /api/datacenters/{id}/devices
 ```
 
-### Networks (SQLite only)
+### Networks
 
 #### List Networks
 
@@ -387,7 +387,7 @@ GET /api/networks/{id}/devices
 
 Returns all devices that have addresses belonging to this network.
 
-### Relationships (SQLite only)
+### Relationships
 
 #### Add Relationship
 
@@ -448,7 +448,7 @@ The MCP server provides AI assistants with tools to manage devices:
   - Parameters: `query` (searches name, IP, tags, domains, datacenter), `tags` (filter by tags)
 - `device_delete` - Delete a device
 
-### Relationship Tools (SQLite only)
+### Relationship Tools
 
 - `device_add_relationship` - Add a relationship between two devices
   - Parameters: `parent_id`, `child_id`, `relationship_type`
@@ -463,7 +463,7 @@ The MCP server provides AI assistants with tools to manage devices:
 - `device_remove_relationship` - Remove a relationship between two devices
   - Parameters: `parent_id`, `child_id`, `relationship_type`
 
-### Datacenter Tools (SQLite only)
+### Datacenter Tools
 
 - `datacenter_list` - List all datacenters, optionally filtered by name
   - Parameters: `name` (optional filter)
@@ -480,7 +480,7 @@ The MCP server provides AI assistants with tools to manage devices:
 - `datacenter_get_devices` - Get all devices located in a specific datacenter
   - Parameters: `id` (datacenter ID or name)
 
-### Network Tools (SQLite only)
+### Network Tools
 
 - `network_list` - List all networks, optionally filtered by name or datacenter
   - Parameters: `name` (optional filter), `datacenter_id` (optional filter)
