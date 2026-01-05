@@ -134,6 +134,14 @@ docker-push:
 	$(DOCKER) push rackd:$(VERSION)
 	$(DOCKER) push rackd:latest
 
+## push-tag: Create and push a git tag (usage: make push-tag TAG=v1.0.0)
+push-tag:
+ifndef TAG
+	$(error TAG is undefined. Usage: make push-tag TAG=v1.0.0)
+endif
+	git tag $(TAG)
+	git push origin $(TAG)
+
 ## docker-compose-up: Start services with docker-compose
 docker-compose-up:
 	@echo "Starting docker-compose..."
