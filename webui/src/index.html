@@ -232,12 +232,19 @@
                                                     </select>
                                                     <input type="text" x-model="addr.label" placeholder="Label" class="w-24 px-3 py-2 border border-gray-300 rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100" aria-label="Label">
                                                     <input type="number" x-model="addr.port" placeholder="Port" min="1" max="65535" class="w-20 px-3 py-2 border border-gray-300 rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100" aria-label="Port">
-                                                    <select x-model="addr.network_id" :value="addr.network_id" class="w-32 px-3 py-2 border border-gray-300 rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100" aria-label="Network">
-                                                        <option value="">No Network</option>
-                                                        <template x-for="net in networks" :key="net.id">
-                                                            <option :value="net.id" x-text="net.name"></option>
-                                                        </template>
-                                                    </select>
+                                                    <template x-if="!networksLoaded">
+                                                        <select disabled class="w-32 px-3 py-2 border border-gray-300 rounded-lg bg-gray-100 dark:bg-gray-600 dark:border-gray-500 dark:text-gray-400">
+                                                            <option>Loading...</option>
+                                                        </select>
+                                                    </template>
+                                                    <template x-if="networksLoaded">
+                                                        <select x-model="addr.network_id" class="w-32 px-3 py-2 border border-gray-300 rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100" aria-label="Network">
+                                                            <option value="">No Network</option>
+                                                            <template x-for="net in networks" :key="net.id">
+                                                                <option :value="net.id" x-text="net.name"></option>
+                                                            </template>
+                                                        </select>
+                                                    </template>
                                                     <input type="text" x-model="addr.switch_port" placeholder="Switch Port" class="w-32 px-3 py-2 border border-gray-300 rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100" aria-label="Switch Port">
                                                     <button type="button" @click="removeAddress(index)" class="px-3 py-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 dark:bg-red-900 dark:text-red-300" aria-label="Remove Address">Remove</button>
                                                 </div>
