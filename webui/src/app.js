@@ -211,6 +211,16 @@ Alpine.data('networkManager', () => ({
         window.addEventListener('refresh-datacenters', () => this.loadDatacenters());
     },
 
+    // Check if there's only one datacenter
+    get hasSingleDatacenter() {
+        return this.datacenters.length === 1;
+    },
+
+    // Get the single datacenter ID if there's only one
+    get singleDatacenterId() {
+        return this.hasSingleDatacenter ? this.datacenters[0].id : null;
+    },
+
     async loadDatacenters() {
         this.loading = true;
         try {
@@ -260,6 +270,10 @@ Alpine.data('networkManager', () => ({
 
     resetForm() {
         this.form = { id: '', name: '', subnet: '', datacenter_id: '', description: '' };
+        // Auto-select the single datacenter if there's only one
+        if (this.hasSingleDatacenter) {
+            this.form.datacenter_id = this.singleDatacenterId;
+        }
     },
 
     async saveNetwork() {
@@ -397,6 +411,16 @@ Alpine.data('deviceManager', () => ({
         });
     },
 
+    // Check if there's only one datacenter
+    get hasSingleDatacenter() {
+        return this.datacenters.length === 1;
+    },
+
+    // Get the single datacenter ID if there's only one
+    get singleDatacenterId() {
+        return this.hasSingleDatacenter ? this.datacenters[0].id : null;
+    },
+
     async ensureDependencies() {
         const promises = [];
         if (!this.networks || this.networks.length === 0) {
@@ -493,6 +517,10 @@ Alpine.data('deviceManager', () => ({
             datacenter_id: '', username: '', location: '', tagsInput: '', domainsInput: '',
             addresses: [{ ip: '', port: '', type: 'ipv4', label: '', network_id: '', switch_port: '' }]
         };
+        // Auto-select the single datacenter if there's only one
+        if (this.hasSingleDatacenter) {
+            this.form.datacenter_id = this.singleDatacenterId;
+        }
     },
 
     addAddress() {

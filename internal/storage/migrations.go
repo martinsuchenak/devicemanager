@@ -645,6 +645,64 @@ func (ss *SQLiteStorage) MigrateToV7() error {
 	return tx.Commit()
 }
 
+// MigrateToV8 creates a default datacenter on fresh installs
+// - Creates a "Default" datacenter if no datacenters exist
+func (ss *SQLiteStorage) MigrateToV8() error {
+	// Check if already migrated
+	var version int
+	err := ss.db.QueryRow("SELECT COALESCE(MAX(version), 0) FROM schema_migrations").Scan(&version)
+	if err != nil {
+		// Table doesn't exist or other error - treat as version 0
+		version = 0
+	}
+	if version >= 8 {
+		return nil // Already migrated
+	}
+
+	tx, err := ss.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	// Check if any datacenters exist
+	var count int
+	err = tx.QueryRow("SELECT COUNT(*) FROM datacenters").Scan(&count)
+	if err != nil {
+		return fmt.Errorf("checking datacenters count: %w", err)
+	}
+
+	// If no datacenters exist, create a default one
+	if count == 0 {
+		_, err = tx.Exec(`
+			INSERT INTO datacenters (id, name, location, description, created_at, updated_at)
+			VALUES ('default', 'Default', '', 'Default datacenter', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+		`)
+		if err != nil {
+			return fmt.Errorf("creating default datacenter: %w", err)
+		}
+	}
+
+	// Ensure schema_migrations table exists
+	_, err = tx.Exec(`
+		CREATE TABLE IF NOT EXISTS schema_migrations (
+			version INTEGER PRIMARY KEY,
+			applied_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+		)
+	`)
+	if err != nil {
+		return fmt.Errorf("creating migrations table: %w", err)
+	}
+
+	// Update migration version
+	_, err = tx.Exec(`INSERT OR IGNORE INTO schema_migrations (version) VALUES (8)`)
+	if err != nil {
+		return fmt.Errorf("setting migration version: %w", err)
+	}
+
+	return tx.Commit()
+}
+
 // isDuplicateColumnError checks if the error is about duplicate column
 func isDuplicateColumnError(err error) bool {
 	return err != nil && (err.Error() == "duplicate column name: datacenter_id" ||

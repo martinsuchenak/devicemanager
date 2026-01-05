@@ -127,6 +127,13 @@ func (h *Handler) createDevice(w http.ResponseWriter, r *http.Request) {
 	device.CreatedAt = now
 	device.UpdatedAt = now
 
+	// Auto-assign default datacenter if none provided
+	if device.DatacenterID == "" {
+		if defaultDC := h.getDefaultDatacenter(); defaultDC != nil {
+			device.DatacenterID = defaultDC.ID
+		}
+	}
+
 	if err := h.storage.CreateDevice(&device); err != nil {
 		if err == storage.ErrInvalidID {
 			h.writeError(w, http.StatusBadRequest, "invalid device ID")
@@ -245,6 +252,23 @@ func generateID(name string) string {
 		return uuid.New().String()
 	}
 	return id.String()
+}
+
+// getDefaultDatacenter returns the default datacenter if it exists and is the only one
+func (h *Handler) getDefaultDatacenter() *model.Datacenter {
+	dcStorage, ok := h.storage.(storage.DatacenterStorage)
+	if !ok {
+		return nil
+	}
+	datacenters, err := dcStorage.ListDatacenters(nil)
+	if err != nil || len(datacenters) != 1 {
+		return nil
+	}
+	// Only use default if it's the "default" ID datacenter
+	if datacenters[0].ID == "default" {
+		return &datacenters[0]
+	}
+	return nil
 }
 
 // StaticFileHandler serves static files (for the web UI)
@@ -658,9 +682,15 @@ func (h *Handler) createNetwork(w http.ResponseWriter, r *http.Request) {
 		h.writeError(w, http.StatusBadRequest, "invalid subnet CIDR: "+network.Subnet)
 		return
 	}
+
+	// Auto-assign default datacenter if none provided
 	if network.DatacenterID == "" {
-		h.writeError(w, http.StatusBadRequest, "datacenter_id is required")
-		return
+		if defaultDC := h.getDefaultDatacenter(); defaultDC != nil {
+			network.DatacenterID = defaultDC.ID
+		} else {
+			h.writeError(w, http.StatusBadRequest, "datacenter_id is required")
+			return
+		}
 	}
 
 	// Generate ID if not provided

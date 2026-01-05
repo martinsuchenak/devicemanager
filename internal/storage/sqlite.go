@@ -141,6 +141,10 @@ func (ss *SQLiteStorage) initSchema() error {
 		return fmt.Errorf("running MigrateToV7: %w", err)
 	}
 
+	if err := ss.MigrateToV8(); err != nil {
+		return fmt.Errorf("running MigrateToV8: %w", err)
+	}
+
 	return nil
 }
 

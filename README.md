@@ -141,7 +141,17 @@ The database is automatically created on first run.
 
 ### Datacenter Management
 
-Devices can be associated with datacenters. When upgrading from an older version, existing location values are automatically migrated to datacenter entries.
+Devices and networks can be associated with datacenters. When upgrading from an older version, existing location values are automatically migrated to datacenter entries.
+
+#### Single Datacenter Mode
+
+When you start Rackd with a fresh database, a "Default" datacenter is automatically created. In single datacenter mode (when only one datacenter exists):
+
+- **Web UI**: The datacenter selection field is hidden in forms and the datacenter column is hidden in tables
+- **API/MCP**: Creating devices or networks without specifying a `datacenter_id` will automatically assign them to the default datacenter
+- **CLI**: The `--datacenter-id` flag is optional when creating devices or networks
+
+This provides a streamlined experience for home labs or single-site deployments. When you add a second datacenter, the datacenter selection becomes visible again.
 
 ### Device Relationships
 
@@ -181,6 +191,11 @@ make cli
   --datacenter-id "dc-123" \
   --tags "server,production,web" \
   --domains "example.com,www.example.com"
+
+# In single datacenter mode, --datacenter-id is optional
+./build/rackd-cli add \
+  --name "server-01" \
+  --make-model "Dell R740"
 
 # List all devices
 ./build/rackd-cli list
@@ -251,6 +266,8 @@ Content-Type: application/json
   ]
 }
 ```
+
+**Note**: In single datacenter mode (when only the default datacenter exists), the `datacenter_id` field is optional and will be automatically assigned.
 
 #### Update Device
 
@@ -359,6 +376,8 @@ Content-Type: application/json
   "description": "Primary production network"
 }
 ```
+
+**Note**: In single datacenter mode (when only the default datacenter exists), the `datacenter_id` field is optional and will be automatically assigned.
 
 #### Update Network
 
