@@ -1,14 +1,17 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Rackd</title>
     <link rel="stylesheet" href="/assets/output.css">
 </head>
+
 <body class="bg-gray-50 text-gray-900 dark:bg-gray-900 dark:text-gray-100" x-data="{ currentView: 'devices' }">
     <!-- Skip to Main Content Link -->
-    <a href="#main-content" class="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 z-50 px-4 py-2 bg-blue-600 text-white rounded-lg shadow-lg">
+    <a href="#main-content"
+        class="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 z-50 px-4 py-2 bg-blue-600 text-white rounded-lg shadow-lg">
         Skip to main content
     </a>
 
@@ -49,7 +52,7 @@
 
     <!-- Main Content -->
     <main id="main-content">
-        
+
         <!-- Devices View -->
         <div x-data="deviceManager" x-show="currentView === 'devices'">
             <!-- Search Bar -->
@@ -78,7 +81,7 @@
                     <button @click="openAddModal()"
                         class="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors dark:bg-blue-500 dark:hover:bg-blue-600">
                         <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
                         </svg>
                         Add Device
                     </button>
@@ -86,7 +89,9 @@
 
                 <!-- Loading State -->
                 <div x-show="loading" class="text-center py-12" role="status">
-                    <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-blue-600 border-t-transparent dark:border-blue-400"></div>
+                    <div
+                        class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-blue-600 border-t-transparent dark:border-blue-400">
+                    </div>
                     <p class="mt-2 text-gray-600 dark:text-gray-400">Loading devices...</p>
                     <span class="sr-only">Loading...</span>
                 </div>
@@ -97,31 +102,50 @@
                         <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                             <thead class="bg-gray-50 dark:bg-gray-700">
                                 <tr>
-                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-gray-300">Name</th>
-                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-gray-300">Details</th>
-                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-gray-300">Datacenter</th>
-                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-gray-300">Addresses</th>
-                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-gray-300">Tags</th>
-                                    <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-gray-300">Actions</th>
+                                    <th scope="col"
+                                        class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-gray-300">
+                                        Name</th>
+                                    <th scope="col"
+                                        class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-gray-300">
+                                        Details</th>
+                                    <th scope="col"
+                                        class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-gray-300">
+                                        Datacenter</th>
+                                    <th scope="col"
+                                        class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-gray-300">
+                                        Addresses</th>
+                                    <th scope="col"
+                                        class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-gray-300">
+                                        Tags</th>
+                                    <th scope="col"
+                                        class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-gray-300">
+                                        Actions</th>
                                 </tr>
                             </thead>
                             <tbody class="bg-white divide-y divide-gray-200 dark:bg-gray-800 dark:divide-gray-700">
                                 <template x-for="device in devices" :key="device.id">
                                     <tr class="hover:bg-gray-50 transition-colors dark:hover:bg-gray-700">
                                         <td class="px-6 py-4 whitespace-nowrap">
-                                            <button class="text-sm font-medium text-gray-900 cursor-pointer hover:text-blue-600 dark:text-gray-100 dark:hover:text-blue-400 text-left w-full" @click="viewDevice(device.id)" x-text="device.name"></button>
-                                            <div class="text-xs text-gray-400 font-mono" x-show="device.id" x-text="device.id"></div>
+                                            <button
+                                                class="text-sm font-medium text-gray-900 cursor-pointer hover:text-blue-600 dark:text-gray-100 dark:hover:text-blue-400 text-left w-full"
+                                                @click="viewDevice(device.id)" x-text="device.name"></button>
+                                            <div class="text-xs text-gray-400 font-mono" x-show="device.id"
+                                                x-text="device.id"></div>
                                         </td>
                                         <td class="px-6 py-4 whitespace-nowrap">
                                             <div class="text-sm text-gray-600 dark:text-gray-300">
                                                 <div x-show="device.make_model" x-text="device.make_model"></div>
-                                                <div x-show="device.os" class="text-gray-400 dark:text-gray-500" x-text="device.os"></div>
-                                                <div x-show="!device.make_model && !device.os" class="text-gray-400 dark:text-gray-500">—</div>
+                                                <div x-show="device.os" class="text-gray-400 dark:text-gray-500"
+                                                    x-text="device.os"></div>
+                                                <div x-show="!device.make_model && !device.os"
+                                                    class="text-gray-400 dark:text-gray-500">—</div>
                                             </div>
                                         </td>
                                         <td class="px-6 py-4 whitespace-nowrap">
-                                            <div class="text-sm text-gray-600 dark:text-gray-300" x-show="device.datacenter_name" x-text="device.datacenter_name"></div>
-                                            <div class="text-sm text-gray-400 dark:text-gray-500" x-show="!device.datacenter_name">—</div>
+                                            <div class="text-sm text-gray-600 dark:text-gray-300"
+                                                x-show="device.datacenter_name" x-text="device.datacenter_name"></div>
+                                            <div class="text-sm text-gray-400 dark:text-gray-500"
+                                                x-show="!device.datacenter_name">—</div>
                                         </td>
                                         <td class="px-6 py-4">
                                             <div class="text-sm text-gray-600 space-y-1 dark:text-gray-300">
@@ -129,25 +153,37 @@
                                                     <div class="font-mono text-xs">
                                                         <span x-text="addr.ip"></span>
                                                         <span x-show="addr.port" x-text="':' + addr.port"></span>
-                                                        <span x-show="addr.label" class="text-gray-400 dark:text-gray-500" x-text="' (' + addr.label + ')'"></span>
-                                                        <span x-show="addr.network_name" class="text-gray-400 dark:text-gray-500" x-text="' [' + addr.network_name + ']'"></span>
+                                                        <span x-show="addr.label"
+                                                            class="text-gray-400 dark:text-gray-500"
+                                                            x-text="' (' + addr.label + ')'"></span>
+                                                        <span x-show="addr.network_name"
+                                                            class="text-gray-400 dark:text-gray-500"
+                                                            x-text="' [' + addr.network_name + ']'"></span>
                                                     </div>
                                                 </template>
-                                                <div x-show="!device.addresses || device.addresses.length === 0" class="text-gray-400 dark:text-gray-500">—</div>
+                                                <div x-show="!device.addresses || device.addresses.length === 0"
+                                                    class="text-gray-400 dark:text-gray-500">—</div>
                                             </div>
                                         </td>
                                         <td class="px-6 py-4">
-                                            <div x-show="device.tags && device.tags.length > 0" class="flex flex-wrap gap-1">
+                                            <div x-show="device.tags && device.tags.length > 0"
+                                                class="flex flex-wrap gap-1">
                                                 <template x-for="tag in device.tags" :key="tag">
-                                                    <span class="inline-flex items-center px-2 py-0.5 bg-blue-100 text-blue-800 text-xs font-medium rounded-full dark:bg-blue-900 dark:text-blue-200" x-text="tag"></span>
+                                                    <span
+                                                        class="inline-flex items-center px-2 py-0.5 bg-blue-100 text-blue-800 text-xs font-medium rounded-full dark:bg-blue-900 dark:text-blue-200"
+                                                        x-text="tag"></span>
                                                 </template>
                                             </div>
-                                            <div x-show="!device.tags || device.tags.length === 0" class="text-sm text-gray-400 dark:text-gray-500">—</div>
+                                            <div x-show="!device.tags || device.tags.length === 0"
+                                                class="text-sm text-gray-400 dark:text-gray-500">—</div>
                                         </td>
                                         <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                            <button @click="viewDevice(device.id)" class="text-blue-600 hover:text-blue-900 mr-3 dark:text-blue-400 dark:hover:text-blue-300">View</button>
-                                            <button @click="editDevice(device.id)" class="text-indigo-600 hover:text-indigo-900 mr-3 dark:text-indigo-400 dark:hover:text-indigo-300">Edit</button>
-                                            <button @click="deleteDevice(device.id)" class="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300">Delete</button>
+                                            <button @click="viewDevice(device.id)"
+                                                class="text-blue-600 hover:text-blue-900 mr-3 dark:text-blue-400 dark:hover:text-blue-300">View</button>
+                                            <button @click="editDevice(device.id)"
+                                                class="text-indigo-600 hover:text-indigo-900 mr-3 dark:text-indigo-400 dark:hover:text-indigo-300">Edit</button>
+                                            <button @click="deleteDevice(device.id)"
+                                                class="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300">Delete</button>
                                         </td>
                                     </tr>
                                 </template>
@@ -165,43 +201,61 @@
             </div>
 
             <!-- Add/Edit Modal with x-trap -->
-            <div x-show="showModal" class="fixed inset-0 z-50 overflow-y-auto" role="dialog" aria-modal="true" x-trap.noscroll="showModal">
+            <div x-show="showModal" class="fixed inset-0 z-50 overflow-y-auto" role="dialog" aria-modal="true"
+                x-trap.noscroll="showModal">
                 <div class="flex min-h-screen items-center justify-center p-4">
-                    <div x-show="showModal" class="fixed inset-0 bg-gray-900/20 backdrop-blur-sm transition-opacity dark:bg-gray-900/50" @click="closeModal()"></div>
+                    <div x-show="showModal"
+                        class="fixed inset-0 bg-gray-900/20 backdrop-blur-sm transition-opacity dark:bg-gray-900/50"
+                        @click="closeModal()"></div>
                     <div class="relative z-10 w-full max-w-lg bg-white rounded-lg shadow-xl dark:bg-gray-800">
                         <!-- Header -->
-                        <div class="flex items-center justify-between border-b border-gray-200 px-6 py-4 dark:border-gray-700">
+                        <div
+                            class="flex items-center justify-between border-b border-gray-200 px-6 py-4 dark:border-gray-700">
                             <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100" x-text="modalTitle"></h3>
-                            <button type="button" @click="closeModal()" class="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300" aria-label="Close modal">
-                                <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                            <button type="button" @click="closeModal()"
+                                class="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300"
+                                aria-label="Close modal">
+                                <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M6 18L18 6M6 6l12 12" />
+                                </svg>
                             </button>
                         </div>
                         <!-- Form -->
                         <div class="px-6 py-4 max-h-[70vh] overflow-y-auto">
                             <form @submit.prevent="saveDevice" class="space-y-4">
                                 <div>
-                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Name *</label>
-                                    <input type="text" x-model="form.name" required minlength="2" 
+                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Name
+                                        *</label>
+                                    <input type="text" x-model="form.name" required minlength="2"
                                         placeholder="e.g. core-router-01"
                                         class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100">
                                 </div>
                                 <div>
-                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Description</label>
-                                    <textarea x-model="form.description" rows="2" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"></textarea>
+                                    <label
+                                        class="block text-sm font-medium text-gray-700 dark:text-gray-300">Description</label>
+                                    <textarea x-model="form.description" rows="2"
+                                        class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"></textarea>
                                 </div>
                                 <div class="grid grid-cols-2 gap-4">
                                     <div>
-                                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Make/Model</label>
-                                        <input type="text" x-model="form.make_model" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100">
+                                        <label
+                                            class="block text-sm font-medium text-gray-700 dark:text-gray-300">Make/Model</label>
+                                        <input type="text" x-model="form.make_model"
+                                            class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100">
                                     </div>
                                     <div>
-                                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">OS</label>
-                                        <input type="text" x-model="form.os" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100">
+                                        <label
+                                            class="block text-sm font-medium text-gray-700 dark:text-gray-300">OS</label>
+                                        <input type="text" x-model="form.os"
+                                            class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100">
                                     </div>
                                 </div>
                                 <div>
-                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Datacenter</label>
-                                    <select x-model="form.datacenter_id" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100">
+                                    <label
+                                        class="block text-sm font-medium text-gray-700 dark:text-gray-300">Datacenter</label>
+                                    <select x-model="form.datacenter_id"
+                                        class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100">
                                         <option value="">No datacenter</option>
                                         <template x-for="dc in datacenters" :key="dc.id">
                                             <option :value="dc.id" x-text="dc.name"></option>
@@ -209,92 +263,134 @@
                                     </select>
                                 </div>
                                 <div>
-                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Username</label>
-                                    <input type="text" x-model="form.username" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100">
+                                    <label
+                                        class="block text-sm font-medium text-gray-700 dark:text-gray-300">Username</label>
+                                    <input type="text" x-model="form.username"
+                                        class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100">
                                 </div>
                                 <div>
-                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Tags</label>
-                                    <input type="text" x-model="form.tagsInput" placeholder="comma separated" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100">
+                                    <label
+                                        class="block text-sm font-medium text-gray-700 dark:text-gray-300">Tags</label>
+                                    <input type="text" x-model="form.tagsInput" placeholder="comma separated"
+                                        class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100">
                                 </div>
                                 <div>
-                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Addresses</label>
+                                    <label
+                                        class="block text-sm font-medium text-gray-700 dark:text-gray-300">Addresses</label>
                                     <div class="space-y-2 mt-1">
                                         <template x-for="(addr, index) in form.addresses" :key="index">
-                                            <div class="border border-gray-200 dark:border-gray-700 rounded-lg p-3 space-y-2">
+                                            <div
+                                                class="border border-gray-200 dark:border-gray-700 rounded-lg p-3 space-y-2">
                                                 <div class="flex gap-2 flex-wrap">
-                                                    <input type="text" x-model="addr.ip" placeholder="IP (e.g. 192.168.1.1)" required 
+                                                    <input type="text" x-model="addr.ip"
+                                                        placeholder="IP (e.g. 192.168.1.1)" required
                                                         pattern="^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$"
                                                         title="Please enter a valid IPv4 address"
-                                                        class="flex-1 min-w-[120px] px-3 py-2 border border-gray-300 rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100" aria-label="IP Address">
-                                                    <select x-model="addr.type" class="w-24 px-3 py-2 border border-gray-300 rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100" aria-label="Type">
+                                                        class="flex-1 min-w-[120px] px-3 py-2 border border-gray-300 rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
+                                                        aria-label="IP Address">
+                                                    <select x-model="addr.type"
+                                                        class="w-24 px-3 py-2 border border-gray-300 rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
+                                                        aria-label="Type">
                                                         <option value="ipv4">IPv4</option>
                                                         <option value="ipv6">IPv6</option>
                                                     </select>
-                                                    <input type="text" x-model="addr.label" placeholder="Label" class="w-24 px-3 py-2 border border-gray-300 rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100" aria-label="Label">
-                                                    <input type="number" x-model="addr.port" placeholder="Port" min="1" max="65535" class="w-20 px-3 py-2 border border-gray-300 rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100" aria-label="Port">
-                                                    <select x-model="addr.network_id" :key="networks.length" class="w-32 px-3 py-2 border border-gray-300 rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100" aria-label="Network">
+                                                    <input type="text" x-model="addr.label" placeholder="Label"
+                                                        class="w-24 px-3 py-2 border border-gray-300 rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
+                                                        aria-label="Label">
+                                                    <input type="number" x-model="addr.port" placeholder="Port" min="1"
+                                                        max="65535"
+                                                        class="w-20 px-3 py-2 border border-gray-300 rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
+                                                        aria-label="Port">
+                                                    <select x-model="addr.network_id"
+                                                        x-init="$nextTick(() => { $el.value = addr.network_id })"
+                                                        class="w-32 px-3 py-2 border border-gray-300 rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
+                                                        aria-label="Network">
                                                         <option value="">No Network</option>
                                                         <template x-for="net in networks" :key="net.id">
                                                             <option :value="net.id" x-text="net.name"></option>
                                                         </template>
                                                     </select>
-                                                    <input type="text" x-model="addr.switch_port" placeholder="Switch Port" class="w-32 px-3 py-2 border border-gray-300 rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100" aria-label="Switch Port">
-                                                    <button type="button" @click="removeAddress(index)" class="px-3 py-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 dark:bg-red-900 dark:text-red-300" aria-label="Remove Address">Remove</button>
+                                                    <input type="text" x-model="addr.switch_port"
+                                                        placeholder="Switch Port"
+                                                        class="w-32 px-3 py-2 border border-gray-300 rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
+                                                        aria-label="Switch Port">
+                                                    <button type="button" @click="removeAddress(index)"
+                                                        class="px-3 py-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 dark:bg-red-900 dark:text-red-300"
+                                                        aria-label="Remove Address">Remove</button>
                                                 </div>
                                             </div>
                                         </template>
-                                        <button type="button" @click="addAddress()" class="w-full px-3 py-2 border border-dashed border-gray-300 rounded-lg text-gray-600 hover:text-blue-600 text-sm dark:border-gray-600 dark:text-gray-400">Add Address</button>
+                                        <button type="button" @click="addAddress()"
+                                            class="w-full px-3 py-2 border border-dashed border-gray-300 rounded-lg text-gray-600 hover:text-blue-600 text-sm dark:border-gray-600 dark:text-gray-400">Add
+                                            Address</button>
                                     </div>
                                 </div>
                             </form>
                         </div>
                         <!-- Footer -->
-                        <div class="border-t border-gray-200 px-6 py-4 bg-gray-50 dark:border-gray-700 dark:bg-gray-900 flex gap-3">
-                            <button @click="saveDevice" :disabled="saving" class="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50">Save</button>
-                            <button @click="closeModal()" class="flex-1 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-200">Cancel</button>
+                        <div
+                            class="border-t border-gray-200 px-6 py-4 bg-gray-50 dark:border-gray-700 dark:bg-gray-900 flex gap-3">
+                            <button @click="saveDevice" :disabled="saving"
+                                class="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50">Save</button>
+                            <button @click="closeModal()"
+                                class="flex-1 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-200">Cancel</button>
                         </div>
                     </div>
                 </div>
             </div>
-            
+
             <!-- View Modal with x-trap -->
-            <div x-show="showViewModal" class="fixed inset-0 z-50 overflow-y-auto" role="dialog" aria-modal="true" x-trap.noscroll="showViewModal">
+            <div x-show="showViewModal" class="fixed inset-0 z-50 overflow-y-auto" role="dialog" aria-modal="true"
+                x-trap.noscroll="showViewModal">
                 <div class="flex min-h-screen items-center justify-center p-4">
-                    <div x-show="showViewModal" class="fixed inset-0 bg-gray-900/20 backdrop-blur-sm transition-opacity dark:bg-gray-900/50" @click="closeViewModal()"></div>
+                    <div x-show="showViewModal"
+                        class="fixed inset-0 bg-gray-900/20 backdrop-blur-sm transition-opacity dark:bg-gray-900/50"
+                        @click="closeViewModal()"></div>
                     <div class="relative z-10 w-full max-w-lg bg-white rounded-lg shadow-xl dark:bg-gray-800">
-                        <div class="flex items-center justify-between border-b border-gray-200 px-6 py-4 dark:border-gray-700">
+                        <div
+                            class="flex items-center justify-between border-b border-gray-200 px-6 py-4 dark:border-gray-700">
                             <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Device Details</h3>
-                            <button type="button" @click="closeViewModal()" class="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300" aria-label="Close modal">
-                                <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                            <button type="button" @click="closeViewModal()"
+                                class="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300"
+                                aria-label="Close modal">
+                                <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M6 18L18 6M6 6l12 12" />
+                                </svg>
                             </button>
                         </div>
                         <div class="px-6 py-4 max-h-[70vh] overflow-y-auto space-y-4">
                             <!-- Details content (simplified for brevity but functionally same as before) -->
-                             <div>
+                            <div>
                                 <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Name</p>
                                 <p class="mt-1 text-gray-900 dark:text-gray-100" x-text="currentDevice.name"></p>
                             </div>
                             <div x-show="currentDevice.description">
                                 <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Description</p>
-                                <p class="mt-1 text-gray-900 dark:text-gray-100 whitespace-pre-wrap" x-text="currentDevice.description"></p>
+                                <p class="mt-1 text-gray-900 dark:text-gray-100 whitespace-pre-wrap"
+                                    x-text="currentDevice.description"></p>
                             </div>
                             <div class="grid grid-cols-2 gap-4">
                                 <div>
                                     <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Make/Model</p>
-                                    <p class="mt-1 text-gray-900 dark:text-gray-100" x-text="currentDevice.make_model || '—'"></p>
+                                    <p class="mt-1 text-gray-900 dark:text-gray-100"
+                                        x-text="currentDevice.make_model || '—'"></p>
                                 </div>
                                 <div>
                                     <p class="text-sm font-medium text-gray-500 dark:text-gray-400">OS</p>
-                                    <p class="mt-1 text-gray-900 dark:text-gray-100" x-text="currentDevice.os || '—'"></p>
+                                    <p class="mt-1 text-gray-900 dark:text-gray-100" x-text="currentDevice.os || '—'">
+                                    </p>
                                 </div>
                             </div>
                             <div>
                                 <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Datacenter</p>
-                                <p class="mt-1 text-gray-900 dark:text-gray-100" x-text="currentDevice.datacenter_name || 'None'"></p>
+                                <p class="mt-1 text-gray-900 dark:text-gray-100"
+                                    x-text="currentDevice.datacenter_name || 'None'"></p>
                             </div>
                             <div>
                                 <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Username</p>
-                                <p class="mt-1 text-gray-900 dark:text-gray-100" x-text="currentDevice.username || '—'"></p>
+                                <p class="mt-1 text-gray-900 dark:text-gray-100" x-text="currentDevice.username || '—'">
+                                </p>
                             </div>
                             <div>
                                 <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Addresses</p>
@@ -303,21 +399,25 @@
                                         <div class="font-mono text-sm text-gray-900 dark:text-gray-100">
                                             <span x-text="addr.ip"></span>
                                             <span x-show="addr.port" x-text="':' + addr.port"></span>
-                                            <span x-show="addr.label" class="text-gray-500 dark:text-gray-400" x-text="' (' + addr.label + ')'"></span>
+                                            <span x-show="addr.label" class="text-gray-500 dark:text-gray-400"
+                                                x-text="' (' + addr.label + ')'"></span>
                                         </div>
                                     </template>
-                                    <p x-show="!currentDevice.addresses || currentDevice.addresses.length === 0" class="text-gray-500 dark:text-gray-400">—</p>
+                                    <p x-show="!currentDevice.addresses || currentDevice.addresses.length === 0"
+                                        class="text-gray-500 dark:text-gray-400">—</p>
                                 </div>
                             </div>
                             <div>
                                 <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Domains</p>
                                 <div class="mt-1 space-y-1">
-                                    <div x-show="Array.isArray(currentDevice.domains) && currentDevice.domains.length > 0">
+                                    <div
+                                        x-show="Array.isArray(currentDevice.domains) && currentDevice.domains.length > 0">
                                         <template x-for="domain in currentDevice.domains" :key="domain">
                                             <div class="text-sm text-gray-900 dark:text-gray-100" x-text="domain"></div>
                                         </template>
                                     </div>
-                                    <p x-show="!Array.isArray(currentDevice.domains) || currentDevice.domains.length === 0" class="text-gray-500 dark:text-gray-400">—</p>
+                                    <p x-show="!Array.isArray(currentDevice.domains) || currentDevice.domains.length === 0"
+                                        class="text-gray-500 dark:text-gray-400">—</p>
                                 </div>
                             </div>
                             <div>
@@ -325,21 +425,29 @@
                                 <div class="mt-1 flex flex-wrap gap-1">
                                     <div x-show="Array.isArray(currentDevice.tags) && currentDevice.tags.length > 0">
                                         <template x-for="tag in currentDevice.tags" :key="tag">
-                                            <span class="inline-flex items-center px-2 py-0.5 bg-blue-100 text-blue-800 text-xs font-medium rounded-full dark:bg-blue-900 dark:text-blue-200" x-text="tag"></span>
+                                            <span
+                                                class="inline-flex items-center px-2 py-0.5 bg-blue-100 text-blue-800 text-xs font-medium rounded-full dark:bg-blue-900 dark:text-blue-200"
+                                                x-text="tag"></span>
                                         </template>
                                     </div>
-                                    <p x-show="!Array.isArray(currentDevice.tags) || currentDevice.tags.length === 0" class="text-gray-500 dark:text-gray-400">—</p>
+                                    <p x-show="!Array.isArray(currentDevice.tags) || currentDevice.tags.length === 0"
+                                        class="text-gray-500 dark:text-gray-400">—</p>
                                 </div>
                             </div>
                             <div>
                                 <p class="text-sm font-medium text-gray-500 dark:text-gray-400">ID</p>
-                                <p class="mt-1 text-sm text-gray-500 font-mono break-all dark:text-gray-400" x-text="currentDevice.id"></p>
+                                <p class="mt-1 text-sm text-gray-500 font-mono break-all dark:text-gray-400"
+                                    x-text="currentDevice.id"></p>
                             </div>
                         </div>
-                        <div class="border-t border-gray-200 px-6 py-4 bg-gray-50 dark:border-gray-700 dark:bg-gray-900 flex gap-3">
-                            <button @click="editCurrentDevice()" class="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Edit</button>
-                            <button @click="deleteCurrentDevice()" class="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">Delete</button>
-                            <button @click="closeViewModal()" class="flex-1 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-200">Close</button>
+                        <div
+                            class="border-t border-gray-200 px-6 py-4 bg-gray-50 dark:border-gray-700 dark:bg-gray-900 flex gap-3">
+                            <button @click="editCurrentDevice()"
+                                class="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Edit</button>
+                            <button @click="deleteCurrentDevice()"
+                                class="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">Delete</button>
+                            <button @click="closeViewModal()"
+                                class="flex-1 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-200">Close</button>
                         </div>
                     </div>
                 </div>
@@ -347,18 +455,24 @@
         </div>
 
         <!-- Networks View -->
-        <div x-data="networkManager" x-show="currentView === 'networks'" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <div x-data="networkManager" x-show="currentView === 'networks'"
+            class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
             <div class="flex justify-between items-center mb-6">
                 <h2 class="text-2xl font-bold text-gray-900 dark:text-gray-100">Networks</h2>
-                <button @click="openAddModal()" class="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600">
-                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                <button @click="openAddModal()"
+                    class="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600">
+                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                    </svg>
                     Add Network
                 </button>
             </div>
-            
-             <!-- Loading State -->
+
+            <!-- Loading State -->
             <div x-show="loading" class="text-center py-12" role="status">
-                <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-blue-600 border-t-transparent dark:border-blue-400"></div>
+                <div
+                    class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-blue-600 border-t-transparent dark:border-blue-400">
+                </div>
                 <p class="mt-2 text-gray-600 dark:text-gray-300">Loading networks...</p>
                 <span class="sr-only">Loading...</span>
             </div>
@@ -368,26 +482,44 @@
                     <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                         <thead class="bg-gray-50 dark:bg-gray-700">
                             <tr>
-                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-gray-300">Name</th>
-                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-gray-300">Subnet</th>
-                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-gray-300">Datacenter</th>
-                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-gray-300">Description</th>
-                                <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-gray-300">Actions</th>
+                                <th scope="col"
+                                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-gray-300">
+                                    Name</th>
+                                <th scope="col"
+                                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-gray-300">
+                                    Subnet</th>
+                                <th scope="col"
+                                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-gray-300">
+                                    Datacenter</th>
+                                <th scope="col"
+                                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-gray-300">
+                                    Description</th>
+                                <th scope="col"
+                                    class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-gray-300">
+                                    Actions</th>
                             </tr>
                         </thead>
                         <tbody class="bg-white divide-y divide-gray-200 dark:bg-gray-800 dark:divide-gray-700">
                             <template x-for="network in networks" :key="network.id">
                                 <tr class="hover:bg-gray-50 dark:hover:bg-gray-700">
                                     <td class="px-6 py-4 whitespace-nowrap">
-                                        <button class="text-sm font-medium text-gray-900 cursor-pointer hover:text-blue-600 dark:text-gray-100 dark:hover:text-blue-400 text-left w-full" @click="viewNetwork(network.id)" x-text="network.name"></button>
+                                        <button
+                                            class="text-sm font-medium text-gray-900 cursor-pointer hover:text-blue-600 dark:text-gray-100 dark:hover:text-blue-400 text-left w-full"
+                                            @click="viewNetwork(network.id)" x-text="network.name"></button>
                                     </td>
-                                    <td class="px-6 py-4 whitespace-nowrap font-mono text-sm" x-text="network.subnet"></td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm" x-text="network.datacenter_name || '—'"></td>
-                                    <td class="px-6 py-4 text-sm text-gray-500 dark:text-gray-400 truncate max-w-xs" x-text="network.description || '—'"></td>
+                                    <td class="px-6 py-4 whitespace-nowrap font-mono text-sm" x-text="network.subnet">
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm"
+                                        x-text="network.datacenter_name || '—'"></td>
+                                    <td class="px-6 py-4 text-sm text-gray-500 dark:text-gray-400 truncate max-w-xs"
+                                        x-text="network.description || '—'"></td>
                                     <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                        <button @click="viewNetwork(network.id)" class="text-blue-600 hover:text-blue-900 mr-3 dark:text-blue-400 dark:hover:text-blue-300">View</button>
-                                        <button @click="editNetwork(network.id)" class="text-indigo-600 hover:text-indigo-900 mr-3 dark:text-indigo-400 dark:hover:text-indigo-300">Edit</button>
-                                        <button @click="deleteNetwork(network.id)" class="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300">Delete</button>
+                                        <button @click="viewNetwork(network.id)"
+                                            class="text-blue-600 hover:text-blue-900 mr-3 dark:text-blue-400 dark:hover:text-blue-300">View</button>
+                                        <button @click="editNetwork(network.id)"
+                                            class="text-indigo-600 hover:text-indigo-900 mr-3 dark:text-indigo-400 dark:hover:text-indigo-300">Edit</button>
+                                        <button @click="deleteNetwork(network.id)"
+                                            class="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300">Delete</button>
                                     </td>
                                 </tr>
                             </template>
@@ -396,35 +528,48 @@
                 </div>
             </div>
 
-             <!-- Add/Edit Modal with x-trap -->
-             <div x-show="showModal" class="fixed inset-0 z-50 overflow-y-auto" role="dialog" aria-modal="true" x-trap.noscroll="showModal">
+            <!-- Add/Edit Modal with x-trap -->
+            <div x-show="showModal" class="fixed inset-0 z-50 overflow-y-auto" role="dialog" aria-modal="true"
+                x-trap.noscroll="showModal">
                 <div class="flex min-h-screen items-center justify-center p-4">
-                    <div x-show="showModal" class="fixed inset-0 bg-gray-900/20 backdrop-blur-sm transition-opacity dark:bg-gray-900/50" @click="closeModal()"></div>
+                    <div x-show="showModal"
+                        class="fixed inset-0 bg-gray-900/20 backdrop-blur-sm transition-opacity dark:bg-gray-900/50"
+                        @click="closeModal()"></div>
                     <div class="relative z-10 w-full max-w-lg bg-white rounded-lg shadow-xl dark:bg-gray-800">
-                        <div class="flex items-center justify-between border-b border-gray-200 px-6 py-4 dark:border-gray-700">
+                        <div
+                            class="flex items-center justify-between border-b border-gray-200 px-6 py-4 dark:border-gray-700">
                             <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100" x-text="modalTitle"></h3>
-                            <button type="button" @click="closeModal()" class="text-gray-400 hover:text-gray-500" aria-label="Close modal">
-                                <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                            <button type="button" @click="closeModal()" class="text-gray-400 hover:text-gray-500"
+                                aria-label="Close modal">
+                                <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M6 18L18 6M6 6l12 12" />
+                                </svg>
                             </button>
                         </div>
                         <div class="px-6 py-4">
                             <form @submit.prevent="saveNetwork" class="space-y-4">
                                 <div>
-                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Name *</label>
-                                    <input type="text" x-model="form.name" required minlength="2" placeholder="e.g. Management LAN"
+                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Name
+                                        *</label>
+                                    <input type="text" x-model="form.name" required minlength="2"
+                                        placeholder="e.g. Management LAN"
                                         class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white text-gray-900 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100">
                                 </div>
                                 <div>
-                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Subnet *</label>
-                                    <input type="text" x-model="form.subnet" required 
+                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Subnet
+                                        *</label>
+                                    <input type="text" x-model="form.subnet" required
                                         pattern="^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\/(3[0-2]|[12]?[0-9])$"
                                         title="Please enter a valid CIDR subnet (e.g. 192.168.1.0/24)"
-                                        placeholder="e.g. 192.168.1.0/24" 
+                                        placeholder="e.g. 192.168.1.0/24"
                                         class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100">
                                 </div>
                                 <div>
-                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Datacenter *</label>
-                                    <select x-model="form.datacenter_id" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100">
+                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Datacenter
+                                        *</label>
+                                    <select x-model="form.datacenter_id" required
+                                        class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100">
                                         <option value="">Select Datacenter</option>
                                         <template x-for="dc in datacenters" :key="dc.id">
                                             <option :value="dc.id" x-text="dc.name"></option>
@@ -433,22 +578,34 @@
                                 </div>
                             </form>
                         </div>
-                        <div class="border-t border-gray-200 px-6 py-4 bg-gray-50 dark:border-gray-700 dark:bg-gray-900 flex gap-3">
-                            <button @click="saveNetwork" :disabled="saving" class="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50">Save</button>
-                            <button @click="closeModal()" class="flex-1 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-200">Cancel</button>
+                        <div
+                            class="border-t border-gray-200 px-6 py-4 bg-gray-50 dark:border-gray-700 dark:bg-gray-900 flex gap-3">
+                            <button @click="saveNetwork" :disabled="saving"
+                                class="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50">Save</button>
+                            <button @click="closeModal()"
+                                class="flex-1 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-200">Cancel</button>
                         </div>
                     </div>
                 </div>
             </div>
             <!-- View Modal with x-trap -->
-            <div x-show="showViewModal" class="fixed inset-0 z-50 overflow-y-auto" role="dialog" aria-modal="true" x-trap.noscroll="showViewModal">
+            <div x-show="showViewModal" class="fixed inset-0 z-50 overflow-y-auto" role="dialog" aria-modal="true"
+                x-trap.noscroll="showViewModal">
                 <div class="flex min-h-screen items-center justify-center p-4">
-                    <div x-show="showViewModal" class="fixed inset-0 bg-gray-900/20 backdrop-blur-sm transition-opacity dark:bg-gray-900/50" @click="closeViewModal()"></div>
+                    <div x-show="showViewModal"
+                        class="fixed inset-0 bg-gray-900/20 backdrop-blur-sm transition-opacity dark:bg-gray-900/50"
+                        @click="closeViewModal()"></div>
                     <div class="relative z-10 w-full max-w-lg bg-white rounded-lg shadow-xl dark:bg-gray-800">
-                        <div class="flex items-center justify-between border-b border-gray-200 px-6 py-4 dark:border-gray-700">
+                        <div
+                            class="flex items-center justify-between border-b border-gray-200 px-6 py-4 dark:border-gray-700">
                             <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Network Details</h3>
-                            <button type="button" @click="closeViewModal()" class="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300" aria-label="Close modal">
-                                <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                            <button type="button" @click="closeViewModal()"
+                                class="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300"
+                                aria-label="Close modal">
+                                <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M6 18L18 6M6 6l12 12" />
+                                </svg>
                             </button>
                         </div>
                         <div class="px-6 py-4 space-y-4">
@@ -458,25 +615,33 @@
                             </div>
                             <div>
                                 <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Subnet</p>
-                                <p class="mt-1 text-gray-900 dark:text-gray-100 font-mono" x-text="currentNetwork.subnet"></p>
+                                <p class="mt-1 text-gray-900 dark:text-gray-100 font-mono"
+                                    x-text="currentNetwork.subnet"></p>
                             </div>
                             <div>
                                 <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Datacenter</p>
-                                <p class="mt-1 text-gray-900 dark:text-gray-100" x-text="currentNetwork.datacenter_name || 'None'"></p>
+                                <p class="mt-1 text-gray-900 dark:text-gray-100"
+                                    x-text="currentNetwork.datacenter_name || 'None'"></p>
                             </div>
                             <div x-show="currentNetwork.description">
                                 <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Description</p>
-                                <p class="mt-1 text-gray-900 dark:text-gray-100 whitespace-pre-wrap" x-text="currentNetwork.description"></p>
+                                <p class="mt-1 text-gray-900 dark:text-gray-100 whitespace-pre-wrap"
+                                    x-text="currentNetwork.description"></p>
                             </div>
                             <div>
                                 <p class="text-sm font-medium text-gray-500 dark:text-gray-400">ID</p>
-                                <p class="mt-1 text-sm text-gray-500 font-mono break-all dark:text-gray-400" x-text="currentNetwork.id"></p>
+                                <p class="mt-1 text-sm text-gray-500 font-mono break-all dark:text-gray-400"
+                                    x-text="currentNetwork.id"></p>
                             </div>
                         </div>
-                        <div class="border-t border-gray-200 px-6 py-4 bg-gray-50 dark:border-gray-700 dark:bg-gray-900 flex gap-3">
-                            <button @click="editCurrentNetwork()" class="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Edit</button>
-                            <button @click="deleteCurrentNetwork()" class="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">Delete</button>
-                            <button @click="closeViewModal()" class="flex-1 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-200">Close</button>
+                        <div
+                            class="border-t border-gray-200 px-6 py-4 bg-gray-50 dark:border-gray-700 dark:bg-gray-900 flex gap-3">
+                            <button @click="editCurrentNetwork()"
+                                class="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Edit</button>
+                            <button @click="deleteCurrentNetwork()"
+                                class="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">Delete</button>
+                            <button @click="closeViewModal()"
+                                class="flex-1 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-200">Close</button>
                         </div>
                     </div>
                 </div>
@@ -484,44 +649,62 @@
         </div>
 
         <!-- Datacenters View -->
-        <div x-data="datacenterManager" x-show="currentView === 'datacenters'" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <div x-data="datacenterManager" x-show="currentView === 'datacenters'"
+            class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
             <div class="flex justify-between items-center mb-6">
                 <h2 class="text-2xl font-bold text-gray-900 dark:text-gray-100">Datacenters</h2>
-                <button @click="openAddModal()" class="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600">
-                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                <button @click="openAddModal()"
+                    class="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600">
+                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                    </svg>
                     Add Datacenter
                 </button>
             </div>
 
             <!-- Loading State -->
             <div x-show="loading" class="text-center py-12" role="status">
-                <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-blue-600 border-t-transparent dark:border-blue-400"></div>
+                <div
+                    class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-blue-600 border-t-transparent dark:border-blue-400">
+                </div>
                 <p class="mt-2 text-gray-600 dark:text-gray-300">Loading datacenters...</p>
                 <span class="sr-only">Loading...</span>
             </div>
 
             <!-- List -->
             <div x-show="!loading" class="bg-white rounded-lg shadow overflow-hidden dark:bg-gray-800">
-                 <div class="overflow-x-auto">
+                <div class="overflow-x-auto">
                     <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                         <thead class="bg-gray-50 dark:bg-gray-700">
                             <tr>
-                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-gray-300">Name</th>
-                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-gray-300">Location</th>
-                                <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-gray-300">Actions</th>
+                                <th scope="col"
+                                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-gray-300">
+                                    Name</th>
+                                <th scope="col"
+                                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-gray-300">
+                                    Location</th>
+                                <th scope="col"
+                                    class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-gray-300">
+                                    Actions</th>
                             </tr>
                         </thead>
-                         <tbody class="bg-white divide-y divide-gray-200 dark:bg-gray-800 dark:divide-gray-700">
+                        <tbody class="bg-white divide-y divide-gray-200 dark:bg-gray-800 dark:divide-gray-700">
                             <template x-for="dc in datacenters" :key="dc.id">
                                 <tr class="hover:bg-gray-50 dark:hover:bg-gray-700">
                                     <td class="px-6 py-4 whitespace-nowrap">
-                                        <button class="text-sm font-medium text-gray-900 cursor-pointer hover:text-blue-600 dark:text-gray-100 dark:hover:text-blue-400 text-left w-full" @click="viewDatacenter(dc.id)" x-text="dc.name"></button>
+                                        <button
+                                            class="text-sm font-medium text-gray-900 cursor-pointer hover:text-blue-600 dark:text-gray-100 dark:hover:text-blue-400 text-left w-full"
+                                            @click="viewDatacenter(dc.id)" x-text="dc.name"></button>
                                     </td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300" x-text="dc.location || '—'"></td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300"
+                                        x-text="dc.location || '—'"></td>
                                     <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                        <button @click="viewDatacenter(dc.id)" class="text-blue-600 hover:text-blue-900 mr-3 dark:text-blue-400 dark:hover:text-blue-300">View</button>
-                                        <button @click="editDatacenter(dc.id)" class="text-indigo-600 hover:text-indigo-900 mr-3 dark:text-indigo-400 dark:hover:text-indigo-300">Edit</button>
-                                        <button @click="deleteDatacenter(dc.id)" class="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300">Delete</button>
+                                        <button @click="viewDatacenter(dc.id)"
+                                            class="text-blue-600 hover:text-blue-900 mr-3 dark:text-blue-400 dark:hover:text-blue-300">View</button>
+                                        <button @click="editDatacenter(dc.id)"
+                                            class="text-indigo-600 hover:text-indigo-900 mr-3 dark:text-indigo-400 dark:hover:text-indigo-300">Edit</button>
+                                        <button @click="deleteDatacenter(dc.id)"
+                                            class="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300">Delete</button>
                                     </td>
                                 </tr>
                             </template>
@@ -530,20 +713,28 @@
                                     No datacenters found. Use the "Add Datacenter" action to create one.
                                 </td>
                             </tr>
-                         </tbody>
+                        </tbody>
                     </table>
-                 </div>
+                </div>
             </div>
 
             <!-- View Modal with x-trap -->
-            <div x-show="showViewModal" class="fixed inset-0 z-50 overflow-y-auto" role="dialog" aria-modal="true" x-trap.noscroll="showViewModal">
+            <div x-show="showViewModal" class="fixed inset-0 z-50 overflow-y-auto" role="dialog" aria-modal="true"
+                x-trap.noscroll="showViewModal">
                 <div class="flex min-h-screen items-center justify-center p-4">
-                    <div x-show="showViewModal" class="fixed inset-0 bg-gray-900/20 backdrop-blur-sm transition-opacity dark:bg-gray-900/50" @click="closeViewModal()"></div>
+                    <div x-show="showViewModal"
+                        class="fixed inset-0 bg-gray-900/20 backdrop-blur-sm transition-opacity dark:bg-gray-900/50"
+                        @click="closeViewModal()"></div>
                     <div class="relative z-10 w-full max-w-lg bg-white rounded-lg shadow-xl dark:bg-gray-800">
-                        <div class="flex items-center justify-between border-b border-gray-200 px-6 py-4 dark:border-gray-700">
+                        <div
+                            class="flex items-center justify-between border-b border-gray-200 px-6 py-4 dark:border-gray-700">
                             <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Datacenter Details</h3>
-                            <button type="button" @click="closeViewModal()" class="text-gray-400 hover:text-gray-500" aria-label="Close modal">
-                                <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                            <button type="button" @click="closeViewModal()" class="text-gray-400 hover:text-gray-500"
+                                aria-label="Close modal">
+                                <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M6 18L18 6M6 6l12 12" />
+                                </svg>
                             </button>
                         </div>
                         <div class="px-6 py-4 space-y-4">
@@ -553,58 +744,81 @@
                             </div>
                             <div x-show="currentDatacenter.location">
                                 <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Location</p>
-                                <p class="mt-1 text-gray-900 dark:text-gray-100" x-text="currentDatacenter.location"></p>
+                                <p class="mt-1 text-gray-900 dark:text-gray-100" x-text="currentDatacenter.location">
+                                </p>
                             </div>
                             <div x-show="currentDatacenter.description">
                                 <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Description</p>
-                                <p class="mt-1 text-gray-900 dark:text-gray-100 whitespace-pre-wrap" x-text="currentDatacenter.description"></p>
+                                <p class="mt-1 text-gray-900 dark:text-gray-100 whitespace-pre-wrap"
+                                    x-text="currentDatacenter.description"></p>
                             </div>
                             <div>
                                 <p class="text-sm font-medium text-gray-500 dark:text-gray-400">ID</p>
-                                <p class="mt-1 text-sm text-gray-500 font-mono break-all dark:text-gray-400" x-text="currentDatacenter.id"></p>
+                                <p class="mt-1 text-sm text-gray-500 font-mono break-all dark:text-gray-400"
+                                    x-text="currentDatacenter.id"></p>
                             </div>
                         </div>
-                        <div class="border-t border-gray-200 px-6 py-4 bg-gray-50 dark:border-gray-700 dark:bg-gray-900 flex gap-3">
-                            <button @click="editCurrentDatacenter()" class="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Edit</button>
-                            <button @click="deleteCurrentDatacenter()" class="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">Delete</button>
-                            <button @click="closeViewModal()" class="flex-1 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-200">Close</button>
+                        <div
+                            class="border-t border-gray-200 px-6 py-4 bg-gray-50 dark:border-gray-700 dark:bg-gray-900 flex gap-3">
+                            <button @click="editCurrentDatacenter()"
+                                class="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Edit</button>
+                            <button @click="deleteCurrentDatacenter()"
+                                class="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">Delete</button>
+                            <button @click="closeViewModal()"
+                                class="flex-1 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-200">Close</button>
                         </div>
                     </div>
                 </div>
             </div>
 
-             <!-- Modal with x-trap -->
-             <div x-show="showModal" class="fixed inset-0 z-50 overflow-y-auto" role="dialog" aria-modal="true" x-trap.noscroll="showModal">
+            <!-- Modal with x-trap -->
+            <div x-show="showModal" class="fixed inset-0 z-50 overflow-y-auto" role="dialog" aria-modal="true"
+                x-trap.noscroll="showModal">
                 <div class="flex min-h-screen items-center justify-center p-4">
-                    <div x-show="showModal" class="fixed inset-0 bg-gray-900/20 backdrop-blur-sm transition-opacity dark:bg-gray-900/50" @click="closeModal()"></div>
+                    <div x-show="showModal"
+                        class="fixed inset-0 bg-gray-900/20 backdrop-blur-sm transition-opacity dark:bg-gray-900/50"
+                        @click="closeModal()"></div>
                     <div class="relative z-10 w-full max-w-lg bg-white rounded-lg shadow-xl dark:bg-gray-800">
-                        <div class="flex items-center justify-between border-b border-gray-200 px-6 py-4 dark:border-gray-700">
+                        <div
+                            class="flex items-center justify-between border-b border-gray-200 px-6 py-4 dark:border-gray-700">
                             <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100" x-text="modalTitle"></h3>
-                            <button type="button" @click="closeModal()" class="text-gray-400 hover:text-gray-500" aria-label="Close modal">
-                                <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                            <button type="button" @click="closeModal()" class="text-gray-400 hover:text-gray-500"
+                                aria-label="Close modal">
+                                <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M6 18L18 6M6 6l12 12" />
+                                </svg>
                             </button>
                         </div>
                         <div class="px-6 py-4">
                             <form @submit.prevent="saveDatacenter" class="space-y-4">
                                 <div>
-                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Name *</label>
-                                    <input type="text" x-model="form.name" required minlength="2" placeholder="e.g. Frankfurt DC"
+                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Name
+                                        *</label>
+                                    <input type="text" x-model="form.name" required minlength="2"
+                                        placeholder="e.g. Frankfurt DC"
                                         class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white text-gray-900 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100">
                                 </div>
                                 <div>
-                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Location</label>
+                                    <label
+                                        class="block text-sm font-medium text-gray-700 dark:text-gray-300">Location</label>
                                     <input type="text" x-model="form.location" placeholder="e.g. Building A, Room 302"
                                         class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white text-gray-900 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100">
                                 </div>
                                 <div>
-                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Description</label>
-                                    <textarea x-model="form.description" rows="2" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"></textarea>
+                                    <label
+                                        class="block text-sm font-medium text-gray-700 dark:text-gray-300">Description</label>
+                                    <textarea x-model="form.description" rows="2"
+                                        class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"></textarea>
                                 </div>
                             </form>
                         </div>
-                        <div class="border-t border-gray-200 px-6 py-4 bg-gray-50 dark:border-gray-700 dark:bg-gray-900 flex gap-3">
-                            <button @click="saveDatacenter" :disabled="saving" class="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50">Save</button>
-                            <button @click="closeModal()" class="flex-1 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-200">Cancel</button>
+                        <div
+                            class="border-t border-gray-200 px-6 py-4 bg-gray-50 dark:border-gray-700 dark:bg-gray-900 flex gap-3">
+                            <button @click="saveDatacenter" :disabled="saving"
+                                class="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50">Save</button>
+                            <button @click="closeModal()"
+                                class="flex-1 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-200">Cancel</button>
                         </div>
                     </div>
                 </div>
@@ -614,17 +828,20 @@
     </main>
 
     <!-- Global Toast Notification -->
-    <div x-data x-show="$store.toast.show" 
-        x-transition:enter="ease-out duration-300" x-transition:enter-start="opacity-0 transform translate-y-2"
+    <div x-data x-show="$store.toast.show" x-transition:enter="ease-out duration-300"
+        x-transition:enter-start="opacity-0 transform translate-y-2"
         x-transition:enter-end="opacity-100 transform translate-y-0" x-transition:leave="ease-in duration-200"
-        x-transition:leave-start="opacity-100 transform translate-y-0" x-transition:leave-end="opacity-0 transform translate-y-2"
+        x-transition:leave-start="opacity-100 transform translate-y-0"
+        x-transition:leave-end="opacity-0 transform translate-y-2"
         :class="$store.toast.type === 'error' ? 'bg-red-500' : $store.toast.type === 'success' ? 'bg-green-500' : 'bg-blue-500'"
         class="fixed bottom-4 right-4 text-white px-6 py-3 rounded-lg shadow-lg z-50 flex items-center space-x-2"
         role="alert">
         <span x-text="$store.toast.message"></span>
-        <button @click="$store.toast.show = false" class="ml-4 hover:opacity-80" aria-label="Close notification">&times;</button>
+        <button @click="$store.toast.show = false" class="ml-4 hover:opacity-80"
+            aria-label="Close notification">&times;</button>
     </div>
 
     <script type="module" src="/assets/app.js"></script>
 </body>
+
 </html>

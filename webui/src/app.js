@@ -20,7 +20,7 @@ const api = {
             if (response.status === 403) throw new Error('Forbidden: You do not have permission to perform this action.');
             if (response.status === 409) throw new Error('Conflict: An item with this name already exists.');
             if (response.status === 400) throw new Error(error.error || 'Invalid data provided. Please check your inputs.');
-            
+
             throw new Error(error.error || `Request failed with status ${response.status}`);
         }
 
@@ -574,10 +574,9 @@ Alpine.data('deviceManager', () => ({
     async editCurrentDevice() {
         await this.ensureDependencies();
         const device = this.currentDevice;
-        this.prepareEditForm(device);
-        this.closeViewModal();
+        this.showModal = true;
         this.$nextTick(() => {
-            this.showModal = true;
+            this.prepareEditForm(device);
         });
     },
 
@@ -585,9 +584,9 @@ Alpine.data('deviceManager', () => ({
         try {
             await this.ensureDependencies();
             const device = await api.get(`/api/devices/${id}`);
-            this.prepareEditForm(device);
+            this.showModal = true;
             this.$nextTick(() => {
-                this.showModal = true;
+                this.prepareEditForm(device);
             });
         } catch (error) {
             Alpine.store('toast').notify('Failed to load device', 'error');
@@ -596,6 +595,10 @@ Alpine.data('deviceManager', () => ({
 
     prepareEditForm(device) {
         this.modalTitle = 'Edit Device';
+        const addresses = device.addresses && device.addresses.length > 0
+            ? device.addresses.map(a => ({ ...a, network_id: a.network_id || '' }))
+            : [{ ip: '', port: '', type: 'ipv4', label: '', network_id: '', switch_port: '' }];
+
         this.form = {
             id: device.id || '',
             name: device.name || '',
@@ -606,9 +609,7 @@ Alpine.data('deviceManager', () => ({
             username: device.username || '',
             tagsInput: (device.tags || []).join(', '),
             domainsInput: (device.domains || []).join(', '),
-            addresses: device.addresses && device.addresses.length > 0
-                ? device.addresses.map(a => ({ ...a, network_id: a.network_id || '' }))
-                : [{ ip: '', port: '', type: 'ipv4', label: '', network_id: '', switch_port: '' }]
+            addresses: addresses
         };
     },
 
