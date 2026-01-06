@@ -9,7 +9,7 @@ DOCKER_COMPOSE=docker-compose
 BUN=$(shell command -v bun || echo $(HOME)/.bun/bin/bun)
 
 # Build flags
-LDFLAGS=-ldflags="-s -w"
+LDFLAGS=-ldflags="-s -w -X main.version=$(VERSION) -X main.commit=$(GIT_COMMIT) -X main.date=$(BUILD_TIME)"
 CGO_ENABLED=0
 
 # Directories
@@ -153,27 +153,6 @@ docker-compose-logs:
 ## docker-compose-ps: Show docker-compose processes
 docker-compose-ps:
 	$(DOCKER_COMPOSE) ps
-
-## nomad-run: Run Nomad job
-nomad-run:
-	@echo "Running Nomad job..."
-	nomad job run $(NOMAD_JOB)
-
-## nomad-stop: Stop Nomad job
-nomad-stop:
-	@echo "Stopping Nomad job..."
-	nomad job stop rackd
-
-## nomad-restart: Restart Nomad job
-nomad-restart:
-	@echo "Restarting Nomad job..."
-	nomad job restart rackd
-
-## nomad-status: Show Nomad job status
-nomad-status:
-	@echo "Nomad job status..."
-	nomad job status rackd
-	nomad alloc status -job rackd
 
 ## run-server: Run server locally
 run-server: binary

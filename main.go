@@ -13,6 +13,12 @@ import (
 	"github.com/paularlott/cli"
 )
 
+var (
+	version = "dev"
+	commit  = "none"
+	date    = "unknown"
+)
+
 func main() {
 	// Load .env file if it exists
 	godotenv.Load()
@@ -22,7 +28,7 @@ func main() {
 
 	rootCmd := &cli.Command{
 		Name:        "rackd",
-		Version:     "1.0.0",
+		Version:     version,
 		Usage:       "Device tracking application with MCP server support",
 		Description: "A Go-based device tracking application with MCP server support, web UI, and CLI",
 		Flags: []cli.Flag{
