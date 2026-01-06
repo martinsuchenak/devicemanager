@@ -215,6 +215,24 @@ func (s *Server) registerTools() {
 		),
 		s.handleNetworkGetDevices,
 	)
+
+	// network_get_pools - Get pools involved with a network
+	s.mcpServer.RegisterTool(
+		mcp.NewTool("network_get_pools", "Get all pools associated with a specific network",
+			mcp.String("id", "Network ID or name", mcp.Required()),
+		),
+		s.handleNetworkGetPools,
+	)
+
+	// Network Pool tools (SQLite only)
+
+	// get_next_pool_ip - Get next available IP from a pool
+	s.mcpServer.RegisterTool(
+		mcp.NewTool("get_next_pool_ip", "Get the next available IP address from a network pool",
+			mcp.String("pool_id", "Pool ID", mcp.Required()),
+		),
+		s.handleGetNextPoolIP,
+	)
 }
 
 // HandleRequest handles MCP HTTP requests with optional bearer token authentication
@@ -755,6 +773,58 @@ func (s *Server) handleNetworkGetDevices(ctx context.Context, req *mcp.ToolReque
 	return mcp.NewToolResponseText(result.String()), nil
 }
 
+func (s *Server) handleNetworkGetPools(ctx context.Context, req *mcp.ToolRequest) (*mcp.ToolResponse, error) {
+	// Check storage capability
+	poolStorage, ok := s.storage.(storage.NetworkPoolStorage)
+	if !ok {
+		return mcp.NewToolResponseText("Network pools are not supported by the current storage backend. Use SQLite storage to enable network pool management."), nil
+	}
+	// Also need network storage to verify network exists
+	netStorage, ok := s.storage.(storage.NetworkStorage)
+	if !ok {
+		return mcp.NewToolResponseText("Networks are not supported by the current storage backend. Use SQLite storage to enable network management."), nil
+	}
+
+	id, err := req.String("id")
+	if err != nil {
+		return nil, mcp.NewToolErrorInvalidParams("id is required: " + err.Error())
+	}
+
+	// Get the network first to verify existence and get name
+	network, err := netStorage.GetNetwork(id)
+	if err != nil {
+		return nil, mcp.NewToolErrorInternal("network not found: " + err.Error())
+	}
+
+	// List pools filtering by network ID
+	pools, err := poolStorage.ListNetworkPools(&model.NetworkPoolFilter{
+		NetworkID: network.ID,
+	})
+	if err != nil {
+		return nil, mcp.NewToolErrorInternal("failed to get network pools: " + err.Error())
+	}
+
+	if len(pools) == 0 {
+		return mcp.NewToolResponseText(fmt.Sprintf("No pools found for network: %s", network.Name)), nil
+	}
+
+	var result strings.Builder
+	result.WriteString(fmt.Sprintf("Pools for network %s (%s):\n\n", network.Name, network.Subnet))
+	for _, pool := range pools {
+		result.WriteString(fmt.Sprintf("- %s (ID: %s)\n", pool.Name, pool.ID))
+		result.WriteString(fmt.Sprintf("  Range: %s - %s\n", pool.StartIP, pool.EndIP))
+		if len(pool.Tags) > 0 {
+			result.WriteString(fmt.Sprintf("  Tags: %s\n", strings.Join(pool.Tags, ", ")))
+		}
+		if pool.Description != "" {
+			result.WriteString(fmt.Sprintf("  Description: %s\n", pool.Description))
+		}
+		result.WriteString("\n")
+	}
+
+	return mcp.NewToolResponseText(result.String()), nil
+}
+
 // Relationship tool handlers
 
 func (s *Server) handleAddRelationship(ctx context.Context, req *mcp.ToolRequest) (*mcp.ToolResponse, error) {
@@ -938,6 +1008,27 @@ func (s *Server) handleRemoveRelationship(ctx context.Context, req *mcp.ToolRequ
 	}
 
 	return mcp.NewToolResponseText(fmt.Sprintf("Relationship removed: %s -> %s (%s)", parentDevice.Name, childDevice.Name, relType)), nil
+}
+
+// Network Pool tool handlers
+
+func (s *Server) handleGetNextPoolIP(ctx context.Context, req *mcp.ToolRequest) (*mcp.ToolResponse, error) {
+	poolID, err := req.String("pool_id")
+	if err != nil {
+		return nil, mcp.NewToolErrorInvalidParams("pool_id is required: " + err.Error())
+	}
+
+	poolStorage, ok := s.storage.(storage.NetworkPoolStorage)
+	if !ok {
+		return mcp.NewToolResponseText("Network pools are not supported by the current storage backend. Use SQLite storage to enable network pool management."), nil
+	}
+
+	ip, err := poolStorage.GetNextAvailableIP(poolID)
+	if err != nil {
+		return nil, mcp.NewToolErrorInternal("failed to get next IP: " + err.Error())
+	}
+
+	return mcp.NewToolResponseText(ip), nil
 }
 
 // Utility functions

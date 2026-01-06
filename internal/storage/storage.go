@@ -43,6 +43,17 @@ type NetworkStorage interface {
 	GetNetworkDevices(networkID string) ([]model.Device, error)
 }
 
+// NetworkPoolStorage defines the interface for network pool storage
+type NetworkPoolStorage interface {
+	CreateNetworkPool(pool *model.NetworkPool) error
+	UpdateNetworkPool(pool *model.NetworkPool) error
+	DeleteNetworkPool(id string) error
+	GetNetworkPool(id string) (*model.NetworkPool, error)
+	ListNetworkPools(filter *model.NetworkPoolFilter) ([]model.NetworkPool, error)
+	GetNextAvailableIP(poolID string) (string, error)
+	ValidateIPInPool(poolID, ip string) (bool, error)
+}
+
 // RelationshipStorage defines the interface for device relationships
 type RelationshipStorage interface {
 	AddRelationship(parentID, childID, relationshipType string) error
@@ -65,4 +76,5 @@ type Storage interface {
 type ExtendedStorage interface {
 	Storage
 	RelationshipStorage
+	NetworkPoolStorage
 }

@@ -48,9 +48,62 @@ Alpine.store('toast', {
     }
 });
 
-Alpine.data('datacenterManager', () => ({
+Alpine.store('appData', {
     datacenters: [],
-    loading: false,
+    networks: [],
+    loadingDatacenters: false,
+    loadingNetworks: false,
+    _datacentersPromise: null,
+    _networksPromise: null,
+
+    async loadDatacenters(force = false) {
+        if (this._datacentersPromise && !force) return this._datacentersPromise;
+        this.loadingDatacenters = true;
+        this._datacentersPromise = (async () => {
+            try {
+                const data = await api.get('/api/datacenters');
+                this.datacenters = Array.isArray(data) ? data : [];
+            } catch (error) {
+                Alpine.store('toast').notify('Failed to load datacenters', 'error');
+                this.datacenters = [];
+            } finally {
+                this.loadingDatacenters = false;
+            }
+            return this.datacenters;
+        })();
+        return this._datacentersPromise;
+    },
+
+    async loadNetworks(force = false) {
+        if (this._networksPromise && !force) return this._networksPromise;
+        this.loadingNetworks = true;
+        this._networksPromise = (async () => {
+            try {
+                const data = await api.get('/api/networks');
+                this.networks = Array.isArray(data) ? data : [];
+            } catch (error) {
+                Alpine.store('toast').notify('Failed to load networks', 'error');
+                this.networks = [];
+            } finally {
+                this.loadingNetworks = false;
+            }
+            return this.networks;
+        })();
+        return this._networksPromise;
+    },
+
+    getDatacenterName(id) {
+        return this.datacenters.find(dc => dc.id === id)?.name || null;
+    },
+
+    getNetworkName(id) {
+        return this.networks.find(n => n.id === id)?.name || null;
+    }
+});
+
+Alpine.data('datacenterManager', () => ({
+    get datacenters() { return Alpine.store('appData').datacenters; },
+    get loading() { return Alpine.store('appData').loadingDatacenters; },
     saving: false,
     showModal: false,
     showViewModal: false,
@@ -59,23 +112,12 @@ Alpine.data('datacenterManager', () => ({
     form: { id: '', name: '', location: '', description: '' },
 
     init() {
-        this.loadDatacenters();
+        Alpine.store('appData').loadDatacenters();
         // Listen for refresh events
-        window.addEventListener('refresh-datacenters', () => this.loadDatacenters());
+        window.addEventListener('refresh-datacenters', () => Alpine.store('appData').loadDatacenters(true));
     },
 
-    async loadDatacenters() {
-        this.loading = true;
-        try {
-            const data = await api.get('/api/datacenters');
-            this.datacenters = Array.isArray(data) ? data : [];
-        } catch (error) {
-            Alpine.store('toast').notify('Failed to load datacenters', 'error');
-            this.datacenters = [];
-        } finally {
-            this.loading = false;
-        }
-    },
+    // loadDatacenters delegates to store
 
     openAddModal() {
         this.modalTitle = 'Add Datacenter';
@@ -110,7 +152,8 @@ Alpine.data('datacenterManager', () => ({
             }
 
             this.closeModal();
-            this.loadDatacenters();
+            this.closeModal();
+            Alpine.store('appData').loadDatacenters(true);
             // Dispatch event for other components
             window.dispatchEvent(new CustomEvent('refresh-datacenters'));
         } catch (error) {
@@ -178,7 +221,7 @@ Alpine.data('datacenterManager', () => ({
         try {
             await api.delete(`/api/datacenters/${id}`);
             Alpine.store('toast').notify('Datacenter deleted successfully', 'success');
-            this.loadDatacenters();
+            Alpine.store('appData').loadDatacenters(true);
             window.dispatchEvent(new CustomEvent('refresh-datacenters'));
             if (this.showViewModal && this.currentDatacenter.id === id) {
                 this.closeViewModal();
@@ -194,9 +237,15 @@ Alpine.data('datacenterManager', () => ({
 }));
 
 Alpine.data('networkManager', () => ({
-    networks: [],
-    datacenters: [],
-    loading: false,
+    get networks() {
+        // Enrich networks with datacenter names on the fly
+        return Alpine.store('appData').networks.map(n => ({
+            ...n,
+            datacenter_name: Alpine.store('appData').getDatacenterName(n.datacenter_id)
+        }));
+    },
+    get datacenters() { return Alpine.store('appData').datacenters; },
+    get loading() { return Alpine.store('appData').loadingNetworks; },
     saving: false,
     showModal: false,
     showViewModal: false,
@@ -205,47 +254,25 @@ Alpine.data('networkManager', () => ({
     form: { id: '', name: '', subnet: '', datacenter_id: '', description: '' },
 
     init() {
-        this.loadNetworks();
-        this.loadDatacenters();
-        window.addEventListener('refresh-networks', () => this.loadNetworks());
-        window.addEventListener('refresh-datacenters', () => this.loadDatacenters());
+        Alpine.store('appData').loadNetworks();
+        Alpine.store('appData').loadDatacenters();
+        window.addEventListener('refresh-networks', () => Alpine.store('appData').loadNetworks(true));
+        window.addEventListener('refresh-datacenters', () => Alpine.store('appData').loadDatacenters(true));
     },
 
-    async loadDatacenters() {
-        this.loading = true;
-        try {
-            const data = await api.get('/api/datacenters');
-            this.datacenters = Array.isArray(data) ? data : [];
-        } catch (error) {
-            Alpine.store('toast').notify('Failed to load datacenters', 'error');
-            this.datacenters = [];
-        } finally {
-            this.loading = false;
-        }
+    // Check if there's only one datacenter
+    get hasSingleDatacenter() {
+        return this.datacenters.length === 1;
     },
 
-
-    async loadNetworks() {
-        this.loading = true;
-        try {
-            const data = await api.get('/api/networks');
-            this.networks = Array.isArray(data) ? data : [];
-            this.enrichNetworks();
-        } catch (error) {
-            Alpine.store('toast').notify('Failed to load networks', 'error');
-            this.networks = [];
-        } finally {
-            this.loading = false;
-        }
+    // Get the single datacenter ID if there's only one
+    get singleDatacenterId() {
+        return this.hasSingleDatacenter ? this.datacenters[0].id : null;
     },
 
-    enrichNetworks() {
-        if (!this.networks.length || !this.datacenters.length) return;
-        this.networks = this.networks.map(network => ({
-            ...network,
-            datacenter_name: this.datacenters.find(dc => dc.id === network.datacenter_id)?.name || null
-        }));
-    },
+    // loadDatacenters and loadNetworks delegate to store
+
+    // enrichNetworks handled by getter
 
     openAddModal() {
         this.modalTitle = 'Add Network';
@@ -260,6 +287,10 @@ Alpine.data('networkManager', () => ({
 
     resetForm() {
         this.form = { id: '', name: '', subnet: '', datacenter_id: '', description: '' };
+        // Auto-select the single datacenter if there's only one
+        if (this.hasSingleDatacenter) {
+            this.form.datacenter_id = this.singleDatacenterId;
+        }
     },
 
     async saveNetwork() {
@@ -281,7 +312,8 @@ Alpine.data('networkManager', () => ({
             }
 
             this.closeModal();
-            this.loadNetworks();
+            this.closeModal();
+            Alpine.store('appData').loadNetworks(true);
             window.dispatchEvent(new CustomEvent('refresh-networks'));
         } catch (error) {
             Alpine.store('toast').notify(error.message, 'error');
@@ -350,7 +382,8 @@ Alpine.data('networkManager', () => ({
         try {
             await api.delete(`/api/networks/${id}`);
             Alpine.store('toast').notify('Network deleted successfully', 'success');
-            this.loadNetworks();
+            Alpine.store('toast').notify('Network deleted successfully', 'success');
+            Alpine.store('appData').loadNetworks(true);
             window.dispatchEvent(new CustomEvent('refresh-networks'));
             if (this.showViewModal && this.currentNetwork.id === id) {
                 this.closeViewModal();
@@ -367,9 +400,10 @@ Alpine.data('networkManager', () => ({
 
 Alpine.data('deviceManager', () => ({
     devices: [],
-    datacenters: [],
-    networks: [],
-    loading: false,
+    get datacenters() { return Alpine.store('appData').datacenters; },
+    get networks() { return Alpine.store('appData').networks; },
+    localLoading: false,
+    get loading() { return this.localLoading; }, // Devices loading is local
     saving: false,
     showModal: false,
     showViewModal: false,
@@ -384,58 +418,40 @@ Alpine.data('deviceManager', () => ({
 
     init() {
         this.loadDevices();
-        this.loadDatacenters();
-        this.loadNetworks();
+        Alpine.store('appData').loadDatacenters();
+        Alpine.store('appData').loadNetworks();
 
         window.addEventListener('refresh-datacenters', () => {
-            this.loadDatacenters();
-            this.loadDevices(); // Reload devices to update datacenter names
+            Alpine.store('appData').loadDatacenters(true).then(() => this.loadDevices());
         });
         window.addEventListener('refresh-networks', () => {
-            this.loadNetworks();
-            this.loadDevices(); // Reload devices to update network names
+            Alpine.store('appData').loadNetworks(true).then(() => this.loadDevices());
         });
     },
 
+    // Check if there's only one datacenter
+    get hasSingleDatacenter() {
+        return this.datacenters.length === 1;
+    },
+
+    // Get the single datacenter ID if there's only one
+    get singleDatacenterId() {
+        return this.hasSingleDatacenter ? this.datacenters[0].id : null;
+    },
+
     async ensureDependencies() {
-        const promises = [];
-        if (!this.networks || this.networks.length === 0) {
-            promises.push(this.loadNetworks());
-        }
-        if (!this.datacenters || this.datacenters.length === 0) {
-            promises.push(this.loadDatacenters());
-        }
-        if (promises.length > 0) {
-            await Promise.all(promises);
-        }
+        await Promise.all([
+            Alpine.store('appData').loadNetworks(),
+            Alpine.store('appData').loadDatacenters()
+        ]);
         // Always wait to ensure DOM options are rendered and ready for binding
         await new Promise(resolve => setTimeout(resolve, 50));
     },
 
-    async loadDatacenters() {
-        try {
-            const data = await api.get('/api/datacenters');
-            this.datacenters = Array.isArray(data) ? data : [];
-            this.enrichDevices();
-        } catch (error) {
-            console.error('Failed to load datacenters', error);
-            this.datacenters = [];
-        }
-    },
-
-    async loadNetworks() {
-        try {
-            const data = await api.get('/api/networks');
-            this.networks = Array.isArray(data) ? data : [];
-            this.enrichDevices();
-        } catch (error) {
-            console.error('Failed to load networks', error);
-            this.networks = [];
-        }
-    },
+    // loadDatacenters and loadNetworks removed
 
     async loadDevices() {
-        this.loading = true;
+        this.localLoading = true;
         try {
             const url = this.searchQuery
                 ? `/api/search?q=${encodeURIComponent(this.searchQuery)}`
@@ -447,7 +463,7 @@ Alpine.data('deviceManager', () => ({
             Alpine.store('toast').notify('Failed to load devices', 'error');
             this.devices = [];
         } finally {
-            this.loading = false;
+            this.localLoading = false;
         }
     },
 
@@ -491,12 +507,16 @@ Alpine.data('deviceManager', () => ({
         this.form = {
             id: '', name: '', description: '', make_model: '', os: '',
             datacenter_id: '', username: '', location: '', tagsInput: '', domainsInput: '',
-            addresses: [{ ip: '', port: '', type: 'ipv4', label: '', network_id: '', switch_port: '' }]
+            addresses: [{ ip: '', port: '', type: 'ipv4', label: '', network_id: '', pool_id: '', switch_port: '' }]
         };
+        // Auto-select the single datacenter if there's only one
+        if (this.hasSingleDatacenter) {
+            this.form.datacenter_id = this.singleDatacenterId;
+        }
     },
 
     addAddress() {
-        this.form.addresses.push({ ip: '', port: '', type: 'ipv4', label: '', network_id: '', switch_port: '' });
+        this.form.addresses.push({ ip: '', port: '', type: 'ipv4', label: '', network_id: '', pool_id: '', switch_port: '' });
     },
 
     removeAddress(index) {
@@ -517,6 +537,7 @@ Alpine.data('deviceManager', () => ({
                     type: a.type || 'ipv4',
                     label: a.label || '',
                     network_id: a.network_id || '',
+                    pool_id: a.pool_id || '',
                     switch_port: a.switch_port || ''
                 }));
 
@@ -575,31 +596,37 @@ Alpine.data('deviceManager', () => ({
     async editCurrentDevice() {
         await this.ensureDependencies();
         const device = this.currentDevice;
-        this.showModal = true;
+        await this.prepareEditForm(device); // Await form preparation including pool fetches
         this.closeViewModal();
-        this.$nextTick(() => {
-            this.prepareEditForm(device);
-        });
+        this.showModal = true;
     },
 
     async editDevice(id) {
         try {
             await this.ensureDependencies();
             const device = await api.get(`/api/devices/${id}`);
+            await this.prepareEditForm(device); // Await form preparation including pool fetches
             this.showModal = true;
-            this.$nextTick(() => {
-                this.prepareEditForm(device);
-            });
         } catch (error) {
             Alpine.store('toast').notify('Failed to load device', 'error');
         }
     },
 
-    prepareEditForm(device) {
+    async prepareEditForm(device) {
         this.modalTitle = 'Edit Device';
         const addresses = device.addresses && device.addresses.length > 0
-            ? device.addresses.map(a => ({ ...a, network_id: a.network_id || '' }))
-            : [{ ip: '', port: '', type: 'ipv4', label: '', network_id: '', switch_port: '' }];
+            ? device.addresses.map(a => ({
+                ...a,
+                network_id: a.network_id || '',
+                pool_id: a.pool_id || '',
+                port: a.port === 0 ? '' : a.port // Display 0 as empty string
+            }))
+            : [{ ip: '', port: '', type: 'ipv4', label: '', network_id: '', pool_id: '', switch_port: '' }];
+
+        // Pre-load pools for existing networks BEFORE setting the form
+        // This ensures options are available when Alpine renders the select
+        const networkIds = [...new Set(addresses.map(a => a.network_id).filter(id => id))];
+        await Promise.all(networkIds.map(id => this.fetchPoolsForNetwork(id)));
 
         this.form = {
             id: device.id || '',
@@ -632,6 +659,126 @@ Alpine.data('deviceManager', () => ({
 
     deleteCurrentDevice() {
         this.deleteDevice(this.currentDevice.id);
+    },
+
+    // Pool Support
+    async getNextIP(poolId, index) {
+        if (!poolId) return;
+        try {
+            const data = await api.get(`/api/pools/${poolId}/next-ip`);
+            if (data.ip) {
+                this.form.addresses[index].ip = data.ip;
+                Alpine.store('toast').notify('IP address suggested', 'success');
+            }
+        } catch (error) {
+            Alpine.store('toast').notify(error.message || 'Failed to get next IP', 'error');
+        }
+    },
+
+
+    async loadPools(networkId) {
+        if (!networkId) return [];
+        try {
+            const data = await api.get(`/api/networks/${networkId}/pools`);
+            return Array.isArray(data) ? data : [];
+        } catch (error) {
+            console.error('Failed to load pools', error);
+            return [];
+        }
+    },
+
+
+
+    availablePools: {}, // Map of networkId -> pools
+    async fetchPoolsForNetwork(networkId) {
+        if (!networkId || this.availablePools[networkId]) return;
+        const pools = await this.loadPools(networkId);
+        // Use spread to ensure reactivity when adding new property
+        this.availablePools = { ...this.availablePools, [networkId]: pools };
+    }
+}));
+
+Alpine.data('poolManager', () => ({
+    pools: [],
+    loading: false,
+    networkId: null,
+    showModal: false,
+    modalTitle: 'Add Network Pool',
+    form: { id: '', name: '', start_ip: '', end_ip: '', description: '' },
+
+    init() {
+        // Listen for events to open manager for a specific network
+        window.addEventListener('manage-pools', (e) => {
+            this.networkId = e.detail.networkId;
+            this.showPoolForm = false;
+            this.loadPools();
+            this.showModal = true;
+        });
+    },
+
+    async loadPools() {
+        if (!this.networkId) return;
+        this.loading = true;
+        try {
+            const data = await api.get(`/api/networks/${this.networkId}/pools`);
+            this.pools = Array.isArray(data) ? data : [];
+        } catch (error) {
+            Alpine.store('toast').notify('Failed to load pools', 'error');
+        } finally {
+            this.loading = false;
+        }
+    },
+
+
+
+    editingPool: null,
+    showPoolForm: false,
+
+    startEdit(pool) {
+        this.editingPool = pool;
+        this.form = { ...pool };
+        this.showPoolForm = true;
+        this.modalTitle = 'Edit Network Pool';
+    },
+
+    startAdd() {
+        this.editingPool = null;
+        this.form = { id: '', name: '', start_ip: '', end_ip: '', description: '' };
+        this.showPoolForm = true;
+        this.modalTitle = 'Add Network Pool';
+    },
+
+    cancelEdit() {
+        this.showPoolForm = false;
+        this.loadPools();
+    },
+
+    async savePool() {
+        try {
+            const payload = { ...this.form, network_id: this.networkId };
+            if (this.editingPool) {
+                await api.put(`/api/pools/${this.form.id}`, payload);
+                Alpine.store('toast').notify('Pool updated', 'success');
+            } else {
+                await api.post(`/api/networks/${this.networkId}/pools`, payload);
+                Alpine.store('toast').notify('Pool created', 'success');
+            }
+            this.showPoolForm = false;
+            this.loadPools();
+        } catch (error) {
+            Alpine.store('toast').notify(error.message, 'error');
+        }
+    },
+
+    async deletePool(id) {
+        if (!confirm('Are you sure?')) return;
+        try {
+            await api.delete(`/api/pools/${id}`);
+            Alpine.store('toast').notify('Pool deleted', 'success');
+            this.loadPools();
+        } catch (error) {
+            Alpine.store('toast').notify('Failed to delete pool', 'error');
+        }
     }
 }));
 

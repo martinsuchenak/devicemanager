@@ -504,7 +504,7 @@ func (ss *SQLiteStorage) MigrateToV6() error {
 	if err != nil {
 		return fmt.Errorf("querying devices: %w", err)
 	}
-	
+
 	var idsToMigrate []string
 	for rows.Next() {
 		var id string
@@ -645,8 +645,270 @@ func (ss *SQLiteStorage) MigrateToV7() error {
 	return tx.Commit()
 }
 
+// MigrateToV8 creates a default datacenter on fresh installs
+// - Creates a "Default" datacenter if no datacenters exist
+func (ss *SQLiteStorage) MigrateToV8() error {
+	// Check if already migrated
+	var version int
+	err := ss.db.QueryRow("SELECT COALESCE(MAX(version), 0) FROM schema_migrations").Scan(&version)
+	if err != nil {
+		// Table doesn't exist or other error - treat as version 0
+		version = 0
+	}
+	if version >= 8 {
+		return nil // Already migrated
+	}
+
+	tx, err := ss.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	// Check if any datacenters exist
+	var count int
+	err = tx.QueryRow("SELECT COUNT(*) FROM datacenters").Scan(&count)
+	if err != nil {
+		return fmt.Errorf("checking datacenters count: %w", err)
+	}
+
+	// If no datacenters exist, create a default one
+	if count == 0 {
+		_, err = tx.Exec(`
+			INSERT INTO datacenters (id, name, location, description, created_at, updated_at)
+			VALUES ('default', 'Default', '', 'Default datacenter', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+		`)
+		if err != nil {
+			return fmt.Errorf("creating default datacenter: %w", err)
+		}
+	}
+
+	// Ensure schema_migrations table exists
+	_, err = tx.Exec(`
+		CREATE TABLE IF NOT EXISTS schema_migrations (
+			version INTEGER PRIMARY KEY,
+			applied_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+		)
+	`)
+	if err != nil {
+		return fmt.Errorf("creating migrations table: %w", err)
+	}
+
+	// Update migration version
+	_, err = tx.Exec(`INSERT OR IGNORE INTO schema_migrations (version) VALUES (8)`)
+	if err != nil {
+		return fmt.Errorf("setting migration version: %w", err)
+	}
+
+	return tx.Commit()
+}
+
 // isDuplicateColumnError checks if the error is about duplicate column
 func isDuplicateColumnError(err error) bool {
 	return err != nil && (err.Error() == "duplicate column name: datacenter_id" ||
 		err.Error() == "table devices has no column named location")
+}
+
+// MigrateToV9 creates network_pools table and adds pool_id to addresses
+func (ss *SQLiteStorage) MigrateToV9() error {
+	// Check if already migrated
+	var version int
+	err := ss.db.QueryRow("SELECT COALESCE(MAX(version), 0) FROM schema_migrations").Scan(&version)
+	if err != nil {
+		version = 0
+	}
+	if version >= 9 {
+		return nil // Already migrated
+	}
+
+	tx, err := ss.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	// Create network_pools table
+	_, err = tx.Exec(`
+		CREATE TABLE IF NOT EXISTS network_pools (
+			id TEXT PRIMARY KEY,
+			network_id TEXT NOT NULL,
+			name TEXT NOT NULL,
+			start_ip TEXT NOT NULL,
+			end_ip TEXT NOT NULL,
+			description TEXT,
+			created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			FOREIGN KEY (network_id) REFERENCES networks(id) ON DELETE CASCADE,
+			UNIQUE(network_id, name)
+		)
+	`)
+	if err != nil {
+		return fmt.Errorf("creating network_pools table: %w", err)
+	}
+
+	// Create indexes for pools
+	_, err = tx.Exec(`CREATE INDEX IF NOT EXISTS idx_network_pools_network_id ON network_pools(network_id)`)
+	if err != nil {
+		return fmt.Errorf("creating network_pools network_id index: %w", err)
+	}
+
+	// Create pool_tags table
+	_, err = tx.Exec(`
+		CREATE TABLE IF NOT EXISTS pool_tags (
+			pool_id TEXT NOT NULL,
+			tag TEXT NOT NULL,
+			PRIMARY KEY (pool_id, tag),
+			FOREIGN KEY (pool_id) REFERENCES network_pools(id) ON DELETE CASCADE
+		)
+	`)
+	if err != nil {
+		return fmt.Errorf("creating pool_tags table: %w", err)
+	}
+
+	// Create trigger for network_pools
+	_, err = tx.Exec(`
+		CREATE TRIGGER IF NOT EXISTS update_network_pools_timestamp
+		AFTER UPDATE ON network_pools
+		FOR EACH ROW
+		BEGIN
+			UPDATE network_pools SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
+		END
+	`)
+	if err != nil {
+		return fmt.Errorf("creating network_pools trigger: %w", err)
+	}
+
+	// Add pool_id column to addresses
+	var poolIDColumn string
+	err = tx.QueryRow(`
+		SELECT name FROM pragma_table_info('addresses')
+		WHERE name='pool_id'
+	`).Scan(&poolIDColumn)
+
+	if err == sql.ErrNoRows {
+		_, err = tx.Exec(`ALTER TABLE addresses ADD COLUMN pool_id TEXT`)
+		if err != nil {
+			return fmt.Errorf("adding pool_id column to addresses: %w", err)
+		}
+
+		_, err = tx.Exec(`CREATE INDEX IF NOT EXISTS idx_addresses_pool_id ON addresses(pool_id)`)
+		if err != nil {
+			return fmt.Errorf("creating addresses pool_id index: %w", err)
+		}
+	}
+
+	// Ensure schema_migrations table exists
+	_, err = tx.Exec(`
+		CREATE TABLE IF NOT EXISTS schema_migrations (
+			version INTEGER PRIMARY KEY,
+			applied_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+		)
+	`)
+	if err != nil {
+		return fmt.Errorf("creating migrations table: %w", err)
+	}
+
+	// Update migration version
+	_, err = tx.Exec(`INSERT OR IGNORE INTO schema_migrations (version) VALUES (9)`)
+	if err != nil {
+		return fmt.Errorf("setting migration version: %w", err)
+	}
+
+	return tx.Commit()
+}
+
+// MigrateToV10 ensures network_pools and pool_tags tables exist (Repair for V9 issues)
+func (ss *SQLiteStorage) MigrateToV10() error {
+	// Check if already migrated
+	var version int
+	err := ss.db.QueryRow("SELECT COALESCE(MAX(version), 0) FROM schema_migrations").Scan(&version)
+	if err != nil {
+		version = 0
+	}
+	if version >= 10 {
+		return nil // Already migrated
+	}
+
+	tx, err := ss.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	// Ensure network_pools table exists (idempotent)
+	_, err = tx.Exec(`
+		CREATE TABLE IF NOT EXISTS network_pools (
+			id TEXT PRIMARY KEY,
+			network_id TEXT NOT NULL,
+			name TEXT NOT NULL,
+			start_ip TEXT NOT NULL,
+			end_ip TEXT NOT NULL,
+			description TEXT,
+			created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			FOREIGN KEY (network_id) REFERENCES networks(id) ON DELETE CASCADE,
+			UNIQUE(network_id, name)
+		)
+	`)
+	if err != nil {
+		return fmt.Errorf("creating network_pools table: %w", err)
+	}
+
+	// Ensure indexes for pools exist
+	_, err = tx.Exec(`CREATE INDEX IF NOT EXISTS idx_network_pools_network_id ON network_pools(network_id)`)
+	if err != nil {
+		return fmt.Errorf("creating network_pools network_id index: %w", err)
+	}
+
+	// Ensure pool_tags table exists (idempotent)
+	_, err = tx.Exec(`
+		CREATE TABLE IF NOT EXISTS pool_tags (
+			pool_id TEXT NOT NULL,
+			tag TEXT NOT NULL,
+			PRIMARY KEY (pool_id, tag),
+			FOREIGN KEY (pool_id) REFERENCES network_pools(id) ON DELETE CASCADE
+		)
+	`)
+	if err != nil {
+		return fmt.Errorf("creating pool_tags table: %w", err)
+	}
+
+	// Ensure trigger exists
+	_, err = tx.Exec(`
+		CREATE TRIGGER IF NOT EXISTS update_network_pools_timestamp
+		AFTER UPDATE ON network_pools
+		FOR EACH ROW
+		BEGIN
+			UPDATE network_pools SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
+		END
+	`)
+	if err != nil {
+		return fmt.Errorf("creating network_pools trigger: %w", err)
+	}
+
+	// Ensure addresses column exists (in case it was missed)
+	var poolIDColumn string
+	err = tx.QueryRow(`
+		SELECT name FROM pragma_table_info('addresses')
+		WHERE name='pool_id'
+	`).Scan(&poolIDColumn)
+
+	if err == sql.ErrNoRows {
+		_, err = tx.Exec(`ALTER TABLE addresses ADD COLUMN pool_id TEXT`)
+		if err != nil {
+			return fmt.Errorf("adding pool_id column to addresses: %w", err)
+		}
+		_, err = tx.Exec(`CREATE INDEX IF NOT EXISTS idx_addresses_pool_id ON addresses(pool_id)`)
+		if err != nil {
+			return fmt.Errorf("creating addresses pool_id index: %w", err)
+		}
+	}
+
+	// Update migration version
+	_, err = tx.Exec(`INSERT OR IGNORE INTO schema_migrations (version) VALUES (10)`)
+	if err != nil {
+		return fmt.Errorf("setting migration version: %w", err)
+	}
+
+	return tx.Commit()
 }

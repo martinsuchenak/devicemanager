@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"log"
 	"net"
@@ -58,6 +59,14 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/devices/{id}/relationships", h.getRelationships)
 	mux.HandleFunc("GET /api/devices/{id}/related", h.getRelatedDevices)
 	mux.HandleFunc("DELETE /api/devices/{id}/relationships/{child_id}/{type}", h.removeRelationship)
+
+	// Network Pools
+	mux.HandleFunc("GET /api/networks/{id}/pools", h.listNetworkPools)
+	mux.HandleFunc("POST /api/networks/{id}/pools", h.createNetworkPool)
+	mux.HandleFunc("GET /api/pools/{id}", h.getNetworkPool)
+	mux.HandleFunc("PUT /api/pools/{id}", h.updateNetworkPool)
+	mux.HandleFunc("DELETE /api/pools/{id}", h.deleteNetworkPool)
+	mux.HandleFunc("GET /api/pools/{id}/next-ip", h.getNextIP)
 }
 
 // listDevices handles GET /api/devices
@@ -109,11 +118,26 @@ func (h *Handler) createDevice(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Validate IP addresses
+	// Validate IP addresses and Pools
 	for _, addr := range device.Addresses {
 		if net.ParseIP(addr.IP) == nil {
 			h.writeError(w, http.StatusBadRequest, "invalid IP address: "+addr.IP)
 			return
+		}
+
+		if addr.PoolID != "" {
+			poolStorage, ok := h.storage.(storage.NetworkPoolStorage)
+			if ok {
+				valid, err := poolStorage.ValidateIPInPool(addr.PoolID, addr.IP)
+				if err != nil {
+					h.writeError(w, http.StatusBadRequest, "validating pool IP: "+err.Error())
+					return
+				}
+				if !valid {
+					h.writeError(w, http.StatusBadRequest, fmt.Sprintf("IP %s is not valid for pool %s", addr.IP, addr.PoolID))
+					return
+				}
+			}
 		}
 	}
 
@@ -126,6 +150,13 @@ func (h *Handler) createDevice(w http.ResponseWriter, r *http.Request) {
 	now := time.Now()
 	device.CreatedAt = now
 	device.UpdatedAt = now
+
+	// Auto-assign default datacenter if none provided
+	if device.DatacenterID == "" {
+		if defaultDC := h.getDefaultDatacenter(); defaultDC != nil {
+			device.DatacenterID = defaultDC.ID
+		}
+	}
 
 	if err := h.storage.CreateDevice(&device); err != nil {
 		if err == storage.ErrInvalidID {
@@ -161,11 +192,26 @@ func (h *Handler) updateDevice(w http.ResponseWriter, r *http.Request) {
 	device.ID = id
 	device.UpdatedAt = time.Now()
 
-	// Validate IP addresses
+	// Validate IP addresses and Pools
 	for _, addr := range device.Addresses {
 		if net.ParseIP(addr.IP) == nil {
 			h.writeError(w, http.StatusBadRequest, "invalid IP address: "+addr.IP)
 			return
+		}
+
+		if addr.PoolID != "" {
+			poolStorage, ok := h.storage.(storage.NetworkPoolStorage)
+			if ok {
+				valid, err := poolStorage.ValidateIPInPool(addr.PoolID, addr.IP)
+				if err != nil {
+					h.writeError(w, http.StatusBadRequest, "validating pool IP: "+err.Error())
+					return
+				}
+				if !valid {
+					h.writeError(w, http.StatusBadRequest, fmt.Sprintf("IP %s is not valid for pool %s", addr.IP, addr.PoolID))
+					return
+				}
+			}
 		}
 	}
 
@@ -245,6 +291,20 @@ func generateID(name string) string {
 		return uuid.New().String()
 	}
 	return id.String()
+}
+
+// getDefaultDatacenter returns the default datacenter if it exists and is the only one
+func (h *Handler) getDefaultDatacenter() *model.Datacenter {
+	dcStorage, ok := h.storage.(storage.DatacenterStorage)
+	if !ok {
+		return nil
+	}
+	datacenters, err := dcStorage.ListDatacenters(nil)
+	if err != nil || len(datacenters) != 1 {
+		return nil
+	}
+	// Return the single existing datacenter as default, regardless of its ID
+	return &datacenters[0]
 }
 
 // StaticFileHandler serves static files (for the web UI)
@@ -658,9 +718,15 @@ func (h *Handler) createNetwork(w http.ResponseWriter, r *http.Request) {
 		h.writeError(w, http.StatusBadRequest, "invalid subnet CIDR: "+network.Subnet)
 		return
 	}
+
+	// Auto-assign default datacenter if none provided
 	if network.DatacenterID == "" {
-		h.writeError(w, http.StatusBadRequest, "datacenter_id is required")
-		return
+		if defaultDC := h.getDefaultDatacenter(); defaultDC != nil {
+			network.DatacenterID = defaultDC.ID
+		} else {
+			h.writeError(w, http.StatusBadRequest, "datacenter_id is required")
+			return
+		}
 	}
 
 	// Generate ID if not provided
@@ -797,4 +863,187 @@ func generateNetworkID() string {
 		return uuid.New().String()
 	}
 	return id.String()
+}
+
+// Network Pool Handlers
+
+func (h *Handler) listNetworkPools(w http.ResponseWriter, r *http.Request) {
+	networkID := r.PathValue("id")
+	if networkID == "" {
+		h.writeError(w, http.StatusBadRequest, "network ID is required")
+		return
+	}
+
+	poolStorage, ok := h.storage.(storage.NetworkPoolStorage)
+	if !ok {
+		h.writeError(w, http.StatusNotImplemented, "network pools not supported by storage backend")
+		return
+	}
+
+	pools, err := poolStorage.ListNetworkPools(&model.NetworkPoolFilter{NetworkID: networkID})
+	if err != nil {
+		h.internalError(w, err)
+		return
+	}
+
+	h.writeJSON(w, http.StatusOK, pools)
+}
+
+func (h *Handler) getNetworkPool(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	if id == "" {
+		h.writeError(w, http.StatusBadRequest, "pool ID is required")
+		return
+	}
+
+	poolStorage, ok := h.storage.(storage.NetworkPoolStorage)
+	if !ok {
+		h.writeError(w, http.StatusNotImplemented, "network pools not supported by storage backend")
+		return
+	}
+
+	pool, err := poolStorage.GetNetworkPool(id)
+	if err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			h.writeError(w, http.StatusNotFound, "network pool not found")
+			return
+		}
+		h.internalError(w, err)
+		return
+	}
+
+	h.writeJSON(w, http.StatusOK, pool)
+}
+
+func (h *Handler) createNetworkPool(w http.ResponseWriter, r *http.Request) {
+	networkID := r.PathValue("id") // From /api/networks/{id}/pools
+	if networkID == "" {
+		h.writeError(w, http.StatusBadRequest, "network ID is required")
+		return
+	}
+
+	var pool model.NetworkPool
+	if err := json.NewDecoder(r.Body).Decode(&pool); err != nil {
+		h.writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	pool.NetworkID = networkID
+	if pool.Name == "" {
+		h.writeError(w, http.StatusBadRequest, "pool name is required")
+		return
+	}
+	if pool.StartIP == "" || pool.EndIP == "" {
+		h.writeError(w, http.StatusBadRequest, "start_ip and end_ip are required")
+		return
+	}
+	if net.ParseIP(pool.StartIP) == nil || net.ParseIP(pool.EndIP) == nil {
+		h.writeError(w, http.StatusBadRequest, "invalid IP address format")
+		return
+	}
+
+	if pool.ID == "" {
+		pool.ID = generateID(pool.Name)
+	}
+
+	poolStorage, ok := h.storage.(storage.NetworkPoolStorage)
+	if !ok {
+		h.writeError(w, http.StatusNotImplemented, "network pools not supported by storage backend")
+		return
+	}
+
+	if err := poolStorage.CreateNetworkPool(&pool); err != nil {
+		if strings.Contains(err.Error(), "already exists") { // Assuming unique name/network constraint
+			h.writeError(w, http.StatusConflict, "network pool already exists")
+			return
+		}
+		h.internalError(w, err)
+		return
+	}
+
+	h.writeJSON(w, http.StatusCreated, pool)
+}
+
+func (h *Handler) updateNetworkPool(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	if id == "" {
+		h.writeError(w, http.StatusBadRequest, "pool ID is required")
+		return
+	}
+
+	var pool model.NetworkPool
+	if err := json.NewDecoder(r.Body).Decode(&pool); err != nil {
+		h.writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	pool.ID = id
+
+	poolStorage, ok := h.storage.(storage.NetworkPoolStorage)
+	if !ok {
+		h.writeError(w, http.StatusNotImplemented, "network pools not supported by storage backend")
+		return
+	}
+
+	if err := poolStorage.UpdateNetworkPool(&pool); err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			h.writeError(w, http.StatusNotFound, "network pool not found")
+			return
+		}
+		h.internalError(w, err)
+		return
+	}
+
+	h.writeJSON(w, http.StatusOK, pool)
+}
+
+func (h *Handler) deleteNetworkPool(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	if id == "" {
+		h.writeError(w, http.StatusBadRequest, "pool ID is required")
+		return
+	}
+
+	poolStorage, ok := h.storage.(storage.NetworkPoolStorage)
+	if !ok {
+		h.writeError(w, http.StatusNotImplemented, "network pools not supported by storage backend")
+		return
+	}
+
+	if err := poolStorage.DeleteNetworkPool(id); err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			h.writeError(w, http.StatusNotFound, "network pool not found")
+			return
+		}
+		h.internalError(w, err)
+		return
+	}
+
+	h.writeJSON(w, http.StatusOK, map[string]string{"message": "network pool deleted"})
+}
+
+func (h *Handler) getNextIP(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	if id == "" {
+		h.writeError(w, http.StatusBadRequest, "pool ID is required")
+		return
+	}
+
+	poolStorage, ok := h.storage.(storage.NetworkPoolStorage)
+	if !ok {
+		h.writeError(w, http.StatusNotImplemented, "network pools not supported by storage backend")
+		return
+	}
+
+	ip, err := poolStorage.GetNextAvailableIP(id)
+	if err != nil {
+		if strings.Contains(err.Error(), "no available IPs") {
+			h.writeError(w, http.StatusConflict, "no available IPs in pool")
+			return
+		}
+		h.internalError(w, err)
+		return
+	}
+
+	h.writeJSON(w, http.StatusOK, map[string]string{"ip": ip})
 }

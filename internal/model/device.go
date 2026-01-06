@@ -29,6 +29,7 @@ type Address struct {
 	Label      string `json:"label"`                 // e.g., "management", "data"
 	NetworkID  string `json:"network_id,omitempty"`  // Network this IP belongs to
 	SwitchPort string `json:"switch_port,omitempty"` // Switch port (e.g., "eth0", "Gi1/0/1")
+	PoolID     string `json:"pool_id,omitempty"`     // Pool this IP belongs to
 }
 
 // DeviceFilter holds filter criteria for listing devices
