@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
 	"os"
 	"path/filepath"
 	"strings"
@@ -143,6 +144,14 @@ func (ss *SQLiteStorage) initSchema() error {
 
 	if err := ss.MigrateToV8(); err != nil {
 		return fmt.Errorf("running MigrateToV8: %w", err)
+	}
+
+	if err := ss.MigrateToV9(); err != nil {
+		return fmt.Errorf("running MigrateToV9: %w", err)
+	}
+
+	if err := ss.MigrateToV10(); err != nil {
+		return fmt.Errorf("running MigrateToV10: %w", err)
 	}
 
 	return nil
@@ -777,7 +786,7 @@ func (ss *SQLiteStorage) loadDeviceTags(device *model.Device) error {
 }
 
 func (ss *SQLiteStorage) loadDeviceAddresses(device *model.Device) error {
-	rows, err := ss.db.Query("SELECT ip, port, type, label, network_id, switch_port FROM addresses WHERE device_id = ? ORDER BY ip", device.ID)
+	rows, err := ss.db.Query("SELECT ip, port, type, label, network_id, pool_id, switch_port FROM addresses WHERE device_id = ? ORDER BY ip", device.ID)
 	if err != nil {
 		return fmt.Errorf("querying addresses: %w", err)
 	}
@@ -786,13 +795,15 @@ func (ss *SQLiteStorage) loadDeviceAddresses(device *model.Device) error {
 	var addresses []model.Address
 	for rows.Next() {
 		var a model.Address
-		var networkID sql.NullString
-		var switchPort sql.NullString
-		if err := rows.Scan(&a.IP, &a.Port, &a.Type, &a.Label, &networkID, &switchPort); err != nil {
+		var networkID, poolID, switchPort sql.NullString
+		if err := rows.Scan(&a.IP, &a.Port, &a.Type, &a.Label, &networkID, &poolID, &switchPort); err != nil {
 			return err
 		}
 		if networkID.Valid {
 			a.NetworkID = networkID.String
+		}
+		if poolID.Valid {
+			a.PoolID = poolID.String
 		}
 		if switchPort.Valid {
 			a.SwitchPort = switchPort.String
@@ -803,7 +814,6 @@ func (ss *SQLiteStorage) loadDeviceAddresses(device *model.Device) error {
 	device.Addresses = addresses
 	return rows.Err()
 }
-
 func (ss *SQLiteStorage) loadDeviceDomains(device *model.Device) error {
 	rows, err := ss.db.Query("SELECT domain FROM domains WHERE device_id = ? ORDER BY domain", device.ID)
 	if err != nil {
@@ -827,8 +837,8 @@ func (ss *SQLiteStorage) loadDeviceDomains(device *model.Device) error {
 func (ss *SQLiteStorage) insertDeviceAddresses(tx *sql.Tx, deviceID string, addresses []model.Address) error {
 	for _, addr := range addresses {
 		query := `
-			INSERT INTO addresses (device_id, ip, port, type, label, network_id, switch_port)
-			VALUES (?, ?, ?, ?, ?, ?, ?)
+			INSERT INTO addresses (device_id, ip, port, type, label, network_id, pool_id, switch_port)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 		`
 		var err error
 		// Convert empty string to nil for NULL in SQL
@@ -838,6 +848,12 @@ func (ss *SQLiteStorage) insertDeviceAddresses(tx *sql.Tx, deviceID string, addr
 		} else {
 			networkIDValue = addr.NetworkID
 		}
+		var poolIDValue interface{}
+		if addr.PoolID == "" {
+			poolIDValue = nil
+		} else {
+			poolIDValue = addr.PoolID
+		}
 		var switchPortValue interface{}
 		if addr.SwitchPort == "" {
 			switchPortValue = nil
@@ -846,9 +862,9 @@ func (ss *SQLiteStorage) insertDeviceAddresses(tx *sql.Tx, deviceID string, addr
 		}
 
 		if tx != nil {
-			_, err = tx.Exec(query, deviceID, addr.IP, addr.Port, addr.Type, addr.Label, networkIDValue, switchPortValue)
+			_, err = tx.Exec(query, deviceID, addr.IP, addr.Port, addr.Type, addr.Label, networkIDValue, poolIDValue, switchPortValue)
 		} else {
-			_, err = ss.db.Exec(query, deviceID, addr.IP, addr.Port, addr.Type, addr.Label, networkIDValue, switchPortValue)
+			_, err = ss.db.Exec(query, deviceID, addr.IP, addr.Port, addr.Type, addr.Label, networkIDValue, poolIDValue, switchPortValue)
 		}
 		if err != nil {
 			return fmt.Errorf("inserting address: %w", err)
@@ -1352,4 +1368,325 @@ func (ss *SQLiteStorage) queryNetwork(query string, args ...interface{}) (*model
 	}
 
 	return &n, nil
+}
+
+// Network Pool Methods
+
+// ListNetworkPools returns pools matching filter
+func (ss *SQLiteStorage) ListNetworkPools(filter *model.NetworkPoolFilter) ([]model.NetworkPool, error) {
+	ss.mu.RLock()
+	defer ss.mu.RUnlock()
+
+	query := `
+		SELECT id, network_id, name, start_ip, end_ip, description, created_at, updated_at
+		FROM network_pools
+		WHERE 1=1
+	`
+	var args []interface{}
+
+	if filter != nil {
+		if filter.NetworkID != "" {
+			query += " AND network_id = ?"
+			args = append(args, filter.NetworkID)
+		}
+	}
+
+	query += " ORDER BY name"
+
+	rows, err := ss.db.Query(query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("querying network pools: %w", err)
+	}
+	defer rows.Close()
+
+	var pools []model.NetworkPool
+	for rows.Next() {
+		var p model.NetworkPool
+		if err := rows.Scan(&p.ID, &p.NetworkID, &p.Name, &p.StartIP, &p.EndIP, &p.Description, &p.CreatedAt, &p.UpdatedAt); err != nil {
+			return nil, fmt.Errorf("scanning network pool: %w", err)
+		}
+		pools = append(pools, p)
+	}
+
+	// Load tags for pools
+	for i := range pools {
+		if err := ss.loadPoolTags(&pools[i]); err != nil {
+			return nil, err
+		}
+	}
+
+	return pools, nil
+}
+
+// GetNetworkPool returns a single pool
+func (ss *SQLiteStorage) GetNetworkPool(id string) (*model.NetworkPool, error) {
+	ss.mu.RLock()
+	defer ss.mu.RUnlock()
+
+	query := `
+		SELECT id, network_id, name, start_ip, end_ip, description, created_at, updated_at
+		FROM network_pools
+		WHERE id = ?
+	`
+	row := ss.db.QueryRow(query, id)
+
+	var p model.NetworkPool
+	if err := row.Scan(&p.ID, &p.NetworkID, &p.Name, &p.StartIP, &p.EndIP, &p.Description, &p.CreatedAt, &p.UpdatedAt); err != nil {
+		if err == sql.ErrNoRows {
+			return nil, fmt.Errorf("network pool not found")
+		}
+		return nil, fmt.Errorf("scanning network pool: %w", err)
+	}
+
+	if err := ss.loadPoolTags(&p); err != nil {
+		return nil, err
+	}
+
+	return &p, nil
+}
+
+// CreateNetworkPool creates a pool
+func (ss *SQLiteStorage) CreateNetworkPool(pool *model.NetworkPool) error {
+	ss.mu.Lock()
+	defer ss.mu.Unlock()
+
+	now := time.Now()
+	pool.CreatedAt = now
+	pool.UpdatedAt = now
+
+	tx, err := ss.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	_, err = tx.Exec(`
+		INSERT INTO network_pools (id, network_id, name, start_ip, end_ip, description, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+	`, pool.ID, pool.NetworkID, pool.Name, pool.StartIP, pool.EndIP, pool.Description, pool.CreatedAt, pool.UpdatedAt)
+	if err != nil {
+		return fmt.Errorf("inserting network pool: %w", err)
+	}
+
+	// Insert tags
+	for _, tag := range pool.Tags {
+		_, err = tx.Exec(`INSERT INTO pool_tags (pool_id, tag) VALUES (?, ?)`, pool.ID, tag)
+		if err != nil {
+			return fmt.Errorf("inserting pool tag: %w", err)
+		}
+	}
+
+	return tx.Commit()
+}
+
+// UpdateNetworkPool updates a pool
+func (ss *SQLiteStorage) UpdateNetworkPool(pool *model.NetworkPool) error {
+	ss.mu.Lock()
+	defer ss.mu.Unlock()
+
+	pool.UpdatedAt = time.Now()
+
+	tx, err := ss.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	result, err := tx.Exec(`
+		UPDATE network_pools
+		SET name = ?, start_ip = ?, end_ip = ?, description = ?, updated_at = ?
+		WHERE id = ?
+	`, pool.Name, pool.StartIP, pool.EndIP, pool.Description, pool.UpdatedAt, pool.ID)
+	if err != nil {
+		return fmt.Errorf("updating network pool: %w", err)
+	}
+	rows, _ := result.RowsAffected()
+	if rows == 0 {
+		return fmt.Errorf("network pool not found")
+	}
+
+	// Update tags
+	_, err = tx.Exec(`DELETE FROM pool_tags WHERE pool_id = ?`, pool.ID)
+	if err != nil {
+		return fmt.Errorf("deleting pool tags: %w", err)
+	}
+	for _, tag := range pool.Tags {
+		_, err = tx.Exec(`INSERT INTO pool_tags (pool_id, tag) VALUES (?, ?)`, pool.ID, tag)
+		if err != nil {
+			return fmt.Errorf("inserting pool tag: %w", err)
+		}
+	}
+
+	return tx.Commit()
+}
+
+// DeleteNetworkPool deletes a pool
+func (ss *SQLiteStorage) DeleteNetworkPool(id string) error {
+	ss.mu.Lock()
+	defer ss.mu.Unlock()
+
+	tx, err := ss.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	// Set pool_id to NULL for all addresses using this pool (safe default behavior)
+	_, err = tx.Exec(`UPDATE addresses SET pool_id = NULL WHERE pool_id = ?`, id)
+	if err != nil {
+		return fmt.Errorf("detaching addresses from pool: %w", err)
+	}
+
+	result, err := tx.Exec(`DELETE FROM network_pools WHERE id = ?`, id)
+	if err != nil {
+		return fmt.Errorf("deleting network pool: %w", err)
+	}
+	rows, _ := result.RowsAffected()
+	if rows == 0 {
+		return fmt.Errorf("network pool not found")
+	}
+
+	return tx.Commit()
+}
+
+// GetNextAvailableIP calculates next available IP in a pool
+func (ss *SQLiteStorage) GetNextAvailableIP(poolID string) (string, error) {
+	ss.mu.RLock()
+	defer ss.mu.RUnlock()
+
+	// Get pool details
+	var startIPStr, endIPStr string
+	err := ss.db.QueryRow("SELECT start_ip, end_ip FROM network_pools WHERE id = ?", poolID).Scan(&startIPStr, &endIPStr)
+	if err != nil {
+		return "", fmt.Errorf("getting pool: %w", err)
+	}
+
+	startIP := net.ParseIP(startIPStr)
+	endIP := net.ParseIP(endIPStr)
+	if startIP == nil || endIP == nil {
+		return "", fmt.Errorf("invalid pool IP range config")
+	}
+
+	// Get all used IPs in this pool (or generally matching IPs to be safe, but let's trust pool_id or direct match)
+	// Ideally we check ALL addresses to avoid conflicts even if not assigned to this pool explicitly,
+	// checking against the pool range. But simpler to check addresses that are "in use".
+	// Optimization: Retrieve all IPs from DB and check in memory if list is small, or check one by one.
+	// Iterating one by one against DB is slow if range is large.
+	// Let's get all IPs and check in memory.
+	rows, err := ss.db.Query("SELECT ip FROM addresses") // Get all IPs to be safe against global conflicts
+	if err != nil {
+		return "", fmt.Errorf("querying used ips: %w", err)
+	}
+	defer rows.Close()
+
+	usedIPs := make(map[string]bool)
+	for rows.Next() {
+		var ip string
+		if err := rows.Scan(&ip); err == nil {
+			usedIPs[ip] = true
+		}
+	}
+
+	// Iterate from start to end
+	curr := duplicateIP(startIP)
+	for ipCompare(curr, endIP) <= 0 {
+		currStr := curr.String()
+		if !usedIPs[currStr] {
+			return currStr, nil
+		}
+		incIP(curr)
+	}
+
+	return "", fmt.Errorf("no available IPs in pool")
+}
+
+// ValidateIPInPool checks if an IP is valid for the given pool
+func (ss *SQLiteStorage) ValidateIPInPool(poolID, ipStr string) (bool, error) {
+	ss.mu.RLock()
+	defer ss.mu.RUnlock()
+
+	var startIPStr, endIPStr string
+	err := ss.db.QueryRow("SELECT start_ip, end_ip FROM network_pools WHERE id = ?", poolID).Scan(&startIPStr, &endIPStr)
+	if err != nil {
+		return false, fmt.Errorf("getting pool: %w", err)
+	}
+
+	ip := net.ParseIP(ipStr)
+	start := net.ParseIP(startIPStr)
+	end := net.ParseIP(endIPStr)
+
+	if ip == nil {
+		return false, fmt.Errorf("invalid IP")
+	}
+
+	if ipCompare(ip, start) >= 0 && ipCompare(ip, end) <= 0 {
+		return true, nil
+	}
+	return false, nil
+}
+
+func (ss *SQLiteStorage) loadPoolTags(pool *model.NetworkPool) error {
+	rows, err := ss.db.Query("SELECT tag FROM pool_tags WHERE pool_id = ?", pool.ID)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	var tags []string
+	for rows.Next() {
+		var tag string
+		if err := rows.Scan(&tag); err != nil {
+			return err
+		}
+		tags = append(tags, tag)
+	}
+	pool.Tags = tags
+	return nil
+}
+
+// IP Helper util functions
+func duplicateIP(ip net.IP) net.IP {
+	dup := make(net.IP, len(ip))
+	copy(dup, ip)
+	return dup
+}
+
+func incIP(ip net.IP) {
+	for j := len(ip) - 1; j >= 0; j-- {
+		ip[j]++
+		if ip[j] > 0 {
+			break
+		}
+	}
+}
+
+func ipCompare(ip1, ip2 net.IP) int {
+	// Ensure we compare compatible versions (both v4 or both v16)
+	// net.ParseIP may return 16-byte representation for v4.
+	// To4() converts to 4-byte if possible.
+	p1 := ip1.To4()
+	if p1 == nil {
+		p1 = ip1 // v6
+	}
+	p2 := ip2.To4()
+	if p2 == nil {
+		p2 = ip2 // v6
+	}
+
+	if len(p1) != len(p2) {
+		if len(p1) < len(p2) {
+			return -1
+		}
+		return 1
+	}
+
+	for i := 0; i < len(p1); i++ {
+		if p1[i] < p2[i] {
+			return -1
+		}
+		if p1[i] > p2[i] {
+			return 1
+		}
+	}
+	return 0
 }

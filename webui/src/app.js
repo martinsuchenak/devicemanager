@@ -515,7 +515,7 @@ Alpine.data('deviceManager', () => ({
         this.form = {
             id: '', name: '', description: '', make_model: '', os: '',
             datacenter_id: '', username: '', location: '', tagsInput: '', domainsInput: '',
-            addresses: [{ ip: '', port: '', type: 'ipv4', label: '', network_id: '', switch_port: '' }]
+            addresses: [{ ip: '', port: '', type: 'ipv4', label: '', network_id: '', pool_id: '', switch_port: '' }]
         };
         // Auto-select the single datacenter if there's only one
         if (this.hasSingleDatacenter) {
@@ -524,7 +524,7 @@ Alpine.data('deviceManager', () => ({
     },
 
     addAddress() {
-        this.form.addresses.push({ ip: '', port: '', type: 'ipv4', label: '', network_id: '', switch_port: '' });
+        this.form.addresses.push({ ip: '', port: '', type: 'ipv4', label: '', network_id: '', pool_id: '', switch_port: '' });
     },
 
     removeAddress(index) {
@@ -545,6 +545,7 @@ Alpine.data('deviceManager', () => ({
                     type: a.type || 'ipv4',
                     label: a.label || '',
                     network_id: a.network_id || '',
+                    pool_id: a.pool_id || '',
                     switch_port: a.switch_port || ''
                 }));
 
@@ -626,8 +627,8 @@ Alpine.data('deviceManager', () => ({
     prepareEditForm(device) {
         this.modalTitle = 'Edit Device';
         const addresses = device.addresses && device.addresses.length > 0
-            ? device.addresses.map(a => ({ ...a, network_id: a.network_id || '' }))
-            : [{ ip: '', port: '', type: 'ipv4', label: '', network_id: '', switch_port: '' }];
+            ? device.addresses.map(a => ({ ...a, network_id: a.network_id || '', pool_id: a.pool_id || '' }))
+            : [{ ip: '', port: '', type: 'ipv4', label: '', network_id: '', pool_id: '', switch_port: '' }];
 
         this.form = {
             id: device.id || '',
@@ -660,6 +661,144 @@ Alpine.data('deviceManager', () => ({
 
     deleteCurrentDevice() {
         this.deleteDevice(this.currentDevice.id);
+    },
+
+    // Pool Support
+    async getNextIP(poolId, index) {
+        if (!poolId) return;
+        try {
+            const data = await api.get(`/api/pools/${poolId}/next-ip`);
+            if (data.ip) {
+                this.form.addresses[index].ip = data.ip;
+                Alpine.store('toast').notify('IP address suggested', 'success');
+            }
+        } catch (error) {
+            Alpine.store('toast').notify(error.message || 'Failed to get next IP', 'error');
+        }
+    },
+
+    pools: [],
+    async loadPools(networkId) {
+        if (!networkId) return [];
+        try {
+            const data = await api.get(`/api/networks/${networkId}/pools`);
+            return Array.isArray(data) ? data : [];
+        } catch (error) {
+            console.error('Failed to load pools', error);
+            return [];
+        }
+    },
+
+    async updatePoolsForAddress(index, networkId) {
+        // This helper is used in the UI to reactively load pools for a selected network
+        // We might need a local cache of pools per network to avoid repeated calls
+        // For now, let's just expose a way to get them.
+        // Actually, Alpine reactivity inside x-for is tricky with async.
+        // Better strategy: Load all pools or load pools when network changes.
+        // But we have multiple addresses with potentially different networks.
+        // Let's store available pools in a map: networkId -> pools
+    },
+
+    availablePools: {}, // Map of networkId -> pools
+    async fetchPoolsForNetwork(networkId) {
+        if (!networkId || this.availablePools[networkId]) return;
+        this.availablePools[networkId] = await this.loadPools(networkId);
+    }
+}));
+
+Alpine.data('poolManager', () => ({
+    pools: [],
+    loading: false,
+    networkId: null,
+    showModal: false,
+    modalTitle: 'Add Network Pool',
+    form: { id: '', name: '', start_ip: '', end_ip: '', description: '' },
+
+    init() {
+        // Listen for events to open manager for a specific network
+        window.addEventListener('manage-pools', (e) => {
+            this.networkId = e.detail.networkId;
+            this.loadPools();
+            this.showModal = true;
+        });
+    },
+
+    async loadPools() {
+        if (!this.networkId) return;
+        this.loading = true;
+        try {
+            const data = await api.get(`/api/networks/${this.networkId}/pools`);
+            this.pools = Array.isArray(data) ? data : [];
+        } catch (error) {
+            Alpine.store('toast').notify('Failed to load pools', 'error');
+        } finally {
+            this.loading = false;
+        }
+    },
+
+    openAddModal() {
+        this.form = { id: '', name: '', start_ip: '', end_ip: '', description: '' };
+        this.modalTitle = 'Add Network Pool';
+        // We use a separate nested modal or replace the view?
+        // Reuse logic from dataManager pattern?
+        // Ideally we need a sub-modal for creating a pool.
+        // For simplicity, let's assume this component manages the LIST of pools
+        // and a form to add/edit them INLINE or via another modal.
+        // Let's use a simple boolean toggle for the form within the modal.
+    },
+
+    // We'll implementing a full CRUD modal for pools inside the Network Edit/View modal 
+    // might be complex. Better to have a dedicated "Manage Pools" modal that lists them 
+    // and allows adding new ones.
+
+    editingPool: null,
+    showPoolForm: false,
+
+    startEdit(pool) {
+        this.editingPool = pool;
+        this.form = { ...pool };
+        this.showPoolForm = true;
+        this.modalTitle = 'Edit Network Pool';
+    },
+
+    startAdd() {
+        this.editingPool = null;
+        this.form = { id: '', name: '', start_ip: '', end_ip: '', description: '' };
+        this.showPoolForm = true;
+        this.modalTitle = 'Add Network Pool';
+    },
+
+    cancelEdit() {
+        this.showPoolForm = false;
+        this.loadPools();
+    },
+
+    async savePool() {
+        try {
+            const payload = { ...this.form, network_id: this.networkId };
+            if (this.editingPool) {
+                await api.put(`/api/pools/${this.form.id}`, payload);
+                Alpine.store('toast').notify('Pool updated', 'success');
+            } else {
+                await api.post(`/api/networks/${this.networkId}/pools`, payload);
+                Alpine.store('toast').notify('Pool created', 'success');
+            }
+            this.showPoolForm = false;
+            this.loadPools();
+        } catch (error) {
+            Alpine.store('toast').notify(error.message, 'error');
+        }
+    },
+
+    async deletePool(id) {
+        if (!confirm('Are you sure?')) return;
+        try {
+            await api.delete(`/api/pools/${id}`);
+            Alpine.store('toast').notify('Pool deleted', 'success');
+            this.loadPools();
+        } catch (error) {
+            Alpine.store('toast').notify('Failed to delete pool', 'error');
+        }
     }
 }));
 

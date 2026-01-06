@@ -215,6 +215,16 @@ func (s *Server) registerTools() {
 		),
 		s.handleNetworkGetDevices,
 	)
+
+	// Network Pool tools (SQLite only)
+
+	// get_next_pool_ip - Get next available IP from a pool
+	s.mcpServer.RegisterTool(
+		mcp.NewTool("get_next_pool_ip", "Get the next available IP address from a network pool",
+			mcp.String("pool_id", "Pool ID", mcp.Required()),
+		),
+		s.handleGetNextPoolIP,
+	)
 }
 
 // HandleRequest handles MCP HTTP requests with optional bearer token authentication
@@ -938,6 +948,27 @@ func (s *Server) handleRemoveRelationship(ctx context.Context, req *mcp.ToolRequ
 	}
 
 	return mcp.NewToolResponseText(fmt.Sprintf("Relationship removed: %s -> %s (%s)", parentDevice.Name, childDevice.Name, relType)), nil
+}
+
+// Network Pool tool handlers
+
+func (s *Server) handleGetNextPoolIP(ctx context.Context, req *mcp.ToolRequest) (*mcp.ToolResponse, error) {
+	poolID, err := req.String("pool_id")
+	if err != nil {
+		return nil, mcp.NewToolErrorInvalidParams("pool_id is required: " + err.Error())
+	}
+
+	poolStorage, ok := s.storage.(storage.NetworkPoolStorage)
+	if !ok {
+		return mcp.NewToolResponseText("Network pools are not supported by the current storage backend. Use SQLite storage to enable network pool management."), nil
+	}
+
+	ip, err := poolStorage.GetNextAvailableIP(poolID)
+	if err != nil {
+		return nil, mcp.NewToolErrorInternal("failed to get next IP: " + err.Error())
+	}
+
+	return mcp.NewToolResponseText(ip), nil
 }
 
 // Utility functions
