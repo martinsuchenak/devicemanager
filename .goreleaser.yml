@@ -3,23 +3,9 @@ version: 2
 project_name: rackd
 
 builds:
-  - id: server
-    main: ./cmd/server
+  - id: rackd
+    main: .
     binary: rackd
-    env:
-      - CGO_ENABLED=0
-    goos:
-      - linux
-      - darwin
-    goarch:
-      - amd64
-      - arm64
-    ldflags:
-      - -s -w -X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date={{.Date}}
-
-  - id: cli
-    main: ./cmd/cli
-    binary: rackd-cli
     env:
       - CGO_ENABLED=0
     goos:

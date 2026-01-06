@@ -13,11 +13,8 @@ RUN go mod download
 # Copy source code
 COPY . .
 
-# Build the server binary
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o rackd ./cmd/server
-
-# Build the CLI binary
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o rackd-cli ./cmd/cli
+# Build the binary
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o rackd .
 
 # Runtime stage
 FROM alpine:latest
@@ -28,7 +25,6 @@ WORKDIR /app
 
 # Copy the binary from builder
 COPY --from=builder /build/rackd .
-COPY --from=builder /build/dm-cli /usr/local/bin/dm-cli
 
 # Create data directory
 RUN mkdir -p /app/data
@@ -45,4 +41,4 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
     CMD wget --no-verbose --tries=1 --spider http://localhost:8080/api/devices || exit 1
 
 # Run the server
-CMD ["./rackd"]
+CMD ["./rackd", "server"]

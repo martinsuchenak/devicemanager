@@ -54,6 +54,7 @@ job "rackd" {
 
       config {
         image = "ghcr.io/martinsuchenak/rackd:latest"
+        args  = ["server"]
 
         ports = ["http"]
 
