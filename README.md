@@ -7,6 +7,7 @@ A Go-based device tracking application with MCP server support, web UI, and CLI.
 - Track devices with detailed information (name, IP addresses, make/model, OS, datacenter, tags, domains, username)
 - Manage datacenters with location and description metadata
 - Manage networks with subnet/CIDR notation and device IP assignments
+- Manage network pools for IP allocation (DHCP ranges, static assignments)
 - SQLite storage with support for device relationships
 - RESTful API for CRUD operations on devices, datacenters, and networks
 - Modern web UI with dark mode support (follows OS theme)
@@ -138,6 +139,14 @@ Rackd uses SQLite for storage with the following benefits:
 - Single file database (`data/devices.db`)
 
 The database is automatically created on first run.
+
+### Network Pools
+
+Rackd supports managing pools of IP addresses within networks (e.g., DHCP ranges, reserved static blocks). Pools are typically used to organize address space within a subnet.
+
+- **Automated Allocation**: Using the API or MCP tools, you can request the "next available IP" from a specific pool.
+- **Conflict Prevention**: The system validates that allocated IPs do not conflict with existing device addresses.
+- **Pool Management**: Create, update, and delete pools with custom ranges (Start IP - End IP) and tags.
 
 ### Datacenter Management
 
@@ -406,6 +415,41 @@ GET /api/networks/{id}/devices
 
 Returns all devices that have addresses belonging to this network.
 
+### Network Pools
+
+#### List Pools for Network
+
+```bash
+GET /api/networks/{id}/pools
+```
+
+#### Create Pool
+
+```bash
+POST /api/networks/{id}/pools
+Content-Type: application/json
+
+{
+  "name": "DHCP Range",
+  "start_ip": "192.168.1.100",
+  "end_ip": "192.168.1.200",
+  "description": "Dynamic allocation pool",
+  "tags": ["dhcp"]
+}
+```
+
+#### Get Pool
+
+```bash
+GET /api/pools/{id}
+```
+
+#### Get Next Available IP
+
+```bash
+GET /api/pools/{id}/next-ip
+```
+
 ### Relationships
 
 #### Add Relationship
@@ -516,6 +560,12 @@ The MCP server provides AI assistants with tools to manage devices:
 - `network_get_devices` - Get all devices with addresses on a specific network
   - Parameters: `id` (network ID or name)
 
+- `network_get_pools` - Get all pools associated with a specific network
+  - Parameters: `id` (network ID or name)
+
+- `get_next_pool_ip` - Get the next available IP address from a network pool
+  - Parameters: `pool_id` (Pool ID)
+
 > **Note:** Datacenter and Network tools will return a helpful message if the storage backend doesn't support these features (use SQLite for full support).
 
 ### MCP Client Configuration
@@ -571,6 +621,16 @@ type Network struct {
     Description  string    `json:"description"`
     CreatedAt    time.Time `json:"created_at"`
     UpdatedAt    time.Time `json:"updated_at"`
+}
+
+type NetworkPool struct {
+    ID          string   `json:"id"`
+    NetworkID   string   `json:"network_id"`
+    Name        string   `json:"name"`
+    StartIP     string   `json:"start_ip"`
+    EndIP       string   `json:"end_ip"`
+    Tags        []string `json:"tags"`
+    Description string   `json:"description"`
 }
 
 type Address struct {

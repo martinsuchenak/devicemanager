@@ -1387,6 +1387,504 @@ components:
             error: name is required
             field: name
 
+paths:
+  /networks/{id}/pools:
+    parameters:
+      - name: id
+        in: path
+        description: Network ID or name
+        required: true
+        schema:
+          type: string
+        example: "01915fdc-8d4f-7126-83d6-9c5b00f00e02"
+
+    get:
+      summary: List network pools
+      description: Retrieve a list of all pools for a specific network
+      operationId: listNetworkPools
+      tags:
+        - pools
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/NetworkPool'
+        '404':
+          description: Network not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: network not found
+        '501':
+          description: Pools not supported by storage backend
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: pools are not supported by this storage backend
+        '500':
+          $ref: '#/components/responses/Error'
+
+    post:
+      summary: Create a new network pool
+      description: Add a new pool to the network
+      operationId: createNetworkPool
+      tags:
+        - pools
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NetworkPoolInput'
+      responses:
+        '201':
+          description: Network pool created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NetworkPool'
+        '400':
+          $ref: '#/components/responses/Error'
+        '409':
+          description: Network pool with this name already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: pool with this name already exists
+        '501':
+          description: Pools not supported by storage backend
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: pools are not supported by this storage backend
+        '500':
+          $ref: '#/components/responses/Error'
+
+  /pools/{id}:
+    parameters:
+      - name: id
+        in: path
+        description: Pool ID
+        required: true
+        schema:
+          type: string
+        example: "01915fdc-8d4f-7126-83d6-9c5b00f00e03"
+
+    get:
+      summary: Get a network pool
+      description: Retrieve a specific network pool by ID
+      operationId: getNetworkPool
+      tags:
+        - pools
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NetworkPool'
+        '404':
+          description: Pool not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: pool not found
+        '501':
+          description: Pools not supported by storage backend
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: pools are not supported by this storage backend
+        '500':
+          $ref: '#/components/responses/Error'
+
+    put:
+      summary: Update a network pool
+      description: Update an existing network pool's information
+      operationId: updateNetworkPool
+      tags:
+        - pools
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NetworkPoolInput'
+      responses:
+        '200':
+          description: Network pool updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NetworkPool'
+        '400':
+          $ref: '#/components/responses/Error'
+        '404':
+          description: Pool not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: pool not found
+        '501':
+          description: Pools not supported by storage backend
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: pools are not supported by this storage backend
+        '500':
+          $ref: '#/components/responses/Error'
+
+    delete:
+      summary: Delete a network pool
+      description: Delete a network pool from the inventory
+      operationId: deleteNetworkPool
+      tags:
+        - pools
+      responses:
+        '204':
+          description: Network pool deleted successfully
+        '404':
+          description: Pool not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: pool not found
+        '501':
+          description: Pools not supported by storage backend
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: pools are not supported by this storage backend
+        '500':
+          $ref: '#/components/responses/Error'
+
+  /pools/{id}/next-ip:
+    parameters:
+      - name: id
+        in: path
+        description: Pool ID
+        required: true
+        schema:
+          type: string
+        example: "01915fdc-8d4f-7126-83d6-9c5b00f00e03"
+
+    get:
+      summary: Get next available IP
+      description: Retrieve the next available IP address from the pool
+      operationId: getNextPoolIP
+      tags:
+        - pools
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ip:
+                    type: string
+                    example: "192.168.1.100"
+        '404':
+          description: Pool not found or no available IPs
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: no available IPs in pool
+        '501':
+          description: Pools not supported by storage backend
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: pools are not supported by this storage backend
+        '500':
+          $ref: '#/components/responses/Error'
+
+components:
+  schemas:
+    Device:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "01915fdc-8d4f-7126-83d6-9c5b00f00e55"
+        name:
+          type: string
+          example: web-server-01
+        description:
+          type: string
+          example: Main web server
+        make_model:
+          type: string
+          example: Dell PowerEdge R740
+        os:
+          type: string
+          example: Ubuntu 22.04
+        datacenter_id:
+          type: string
+          example: "01915fdc-8d4f-7126-83d6-9c5b00f00e01"
+        datacenter_name:
+          type: string
+          example: NYC1
+          readOnly: true
+        username:
+          type: string
+          example: admin
+        location:
+          type: string
+          example: "Rack A-1"
+        tags:
+          type: array
+          items:
+            type: string
+          example: [server, production, web]
+        domains:
+          type: array
+          items:
+            type: string
+          example: [example.com]
+        addresses:
+          type: array
+          items:
+            $ref: '#/components/schemas/Address'
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    DeviceInput:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          minLength: 2
+        description:
+          type: string
+        make_model:
+          type: string
+        os:
+          type: string
+        datacenter_id:
+          type: string
+        username:
+          type: string
+        location:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+        domains:
+          type: array
+          items:
+            type: string
+        addresses:
+          type: array
+          items:
+            $ref: '#/components/schemas/Address'
+
+    Address:
+      type: object
+      required:
+        - ip
+      properties:
+        ip:
+          type: string
+          example: 192.168.1.10
+        port:
+          type: integer
+          example: 443
+        type:
+          type: string
+          enum: [ipv4, ipv6]
+          default: ipv4
+        label:
+          type: string
+          example: management
+        network_id:
+          type: string
+          example: "01915fdc-8d4f-7126-83d6-9c5b00f00e02"
+        network_name:
+          type: string
+          example: production-network
+          readOnly: true
+        pool_id:
+          type: string
+          example: "01915fdc-8d4f-7126-83d6-9c5b00f00e03"
+        switch_port:
+          type: string
+          example: eth0
+
+    Datacenter:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "01915fdc-8d4f-7126-83d6-9c5b00f00e01"
+        name:
+          type: string
+          example: NYC1
+        location:
+          type: string
+          example: New York, USA
+        description:
+          type: string
+          example: Primary US East datacenter
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    DatacenterInput:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          minLength: 2
+        location:
+          type: string
+        description:
+          type: string
+
+    Network:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "01915fdc-8d4f-7126-83d6-9c5b00f00e02"
+        name:
+          type: string
+          example: production-network
+        subnet:
+          type: string
+          example: 192.168.1.0/24
+        datacenter_id:
+          type: string
+          example: "01915fdc-8d4f-7126-83d6-9c5b00f00e01"
+        description:
+          type: string
+          example: Production network in NYC1
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    NetworkInput:
+      type: object
+      required:
+        - name
+        - subnet
+        - datacenter_id
+      properties:
+        name:
+          type: string
+          minLength: 2
+        subnet:
+          type: string
+        datacenter_id:
+          type: string
+        description:
+          type: string
+
+    NetworkPool:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "01915fdc-8d4f-7126-83d6-9c5b00f00e03"
+        network_id:
+          type: string
+          example: "01915fdc-8d4f-7126-83d6-9c5b00f00e02"
+        name:
+          type: string
+          example: DHCP Range
+        start_ip:
+          type: string
+          example: 192.168.1.100
+        end_ip:
+          type: string
+          example: 192.168.1.200
+        description:
+          type: string
+          example: Dynamic allocation pool
+        tags:
+          type: array
+          items:
+            type: string
+          example: [dhcp, dynamic]
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    NetworkPoolInput:
+      type: object
+      required:
+        - name
+        - start_ip
+        - end_ip
+      properties:
+        name:
+          type: string
+          minLength: 2
+        start_ip:
+          type: string
+        end_ip:
+          type: string
+        description:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          example: internal server error
+
   securitySchemes:
     BearerAuth:
       type: http

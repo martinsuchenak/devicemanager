@@ -627,7 +627,12 @@ Alpine.data('deviceManager', () => ({
     prepareEditForm(device) {
         this.modalTitle = 'Edit Device';
         const addresses = device.addresses && device.addresses.length > 0
-            ? device.addresses.map(a => ({ ...a, network_id: a.network_id || '', pool_id: a.pool_id || '' }))
+            ? device.addresses.map(a => ({
+                ...a,
+                network_id: a.network_id || '',
+                pool_id: a.pool_id || '',
+                port: a.port === 0 ? '' : a.port // Display 0 as empty string
+            }))
             : [{ ip: '', port: '', type: 'ipv4', label: '', network_id: '', pool_id: '', switch_port: '' }];
 
         this.form = {
