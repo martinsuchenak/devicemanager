@@ -4,6 +4,8 @@ import (
 	"crypto/subtle"
 	"net/http"
 	"strings"
+
+	"github.com/martinsuchenak/rackd/internal/log"
 )
 
 // SecurityHeadersMiddleware adds security headers to responses
@@ -37,13 +39,17 @@ func AuthMiddleware(token string, next http.Handler) http.Handler {
 
 		// If token is not set, skip auth
 		if token == "" {
+			log.Debug("API request without authentication", "path", r.URL.Path, "method", r.Method)
 			next.ServeHTTP(w, r)
 			return
 		}
 
+		log.Debug("API authentication required", "path", r.URL.Path, "method", r.Method)
+
 		// Check Authorization header
 		authHeader := r.Header.Get("Authorization")
 		if authHeader == "" {
+			log.Warn("API request missing Authorization header", "path", r.URL.Path, "method", r.Method, "remote_addr", r.RemoteAddr)
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
 			return
 		}
@@ -51,10 +57,12 @@ func AuthMiddleware(token string, next http.Handler) http.Handler {
 		// Check Bearer token
 		parts := strings.Split(authHeader, " ")
 		if len(parts) != 2 || parts[0] != "Bearer" || subtle.ConstantTimeCompare([]byte(parts[1]), []byte(token)) != 1 {
+			log.Warn("API request with invalid token", "path", r.URL.Path, "method", r.Method, "remote_addr", r.RemoteAddr)
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
 			return
 		}
 
+		log.Debug("API request authenticated successfully", "path", r.URL.Path, "method", r.Method)
 		next.ServeHTTP(w, r)
 	})
 }

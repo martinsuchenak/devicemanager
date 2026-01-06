@@ -6,68 +6,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"net/http/httptest"
 	"testing"
-
-	"github.com/martinsuchenak/rackd/internal/api"
-	"github.com/martinsuchenak/rackd/internal/storage"
 )
-
-// TestServer is a helper for integration tests
-type TestServer struct {
-	server   *httptest.Server
-	handler  *api.Handler
-	storage  storage.Storage
-	stopChan chan struct{}
-}
-
-// NewTestServer creates a new test server
-func NewTestServer(t *testing.T) *TestServer {
-	t.Helper()
-
-	tmpDir := t.TempDir()
-
-	store, err := storage.NewSQLiteStorage(tmpDir)
-	if err != nil {
-		t.Fatalf("Failed to create storage: %v", err)
-	}
-
-	handler := api.NewHandler(store)
-	mux := http.NewServeMux()
-	handler.RegisterRoutes(mux)
-
-	server := httptest.NewServer(mux)
-
-	return &TestServer{
-		server:  server,
-		handler: handler,
-		storage: store,
-	}
-}
-
-// Close stops the test server
-func (ts *TestServer) Close() {
-	if ts.server != nil {
-		ts.server.Close()
-	}
-}
-
-// URL returns the base URL of the test server
-func (ts *TestServer) URL() string {
-	return ts.server.URL
-}
-
-// DeviceJSON is a helper for creating device JSON
-func DeviceJSON(name string, extra map[string]interface{}) []byte {
-	device := map[string]interface{}{
-		"name": name,
-	}
-	for k, v := range extra {
-		device[k] = v
-	}
-	data, _ := json.Marshal(device)
-	return data
-}
 
 // TestAPI_Integration_CreateReadUpdateDelete tests the full device lifecycle
 func TestAPI_Integration_CreateReadUpdateDelete(t *testing.T) {
@@ -301,10 +241,10 @@ func TestAPI_SearchDevices(t *testing.T) {
 	}
 
 	tests := []struct {
-		name      string
-		query     string
-		minCount  int
-		maxCount  int
+		name     string
+		query    string
+		minCount int
+		maxCount int
 	}{
 		{"Search by name", "server", 2, 3},
 		{"Search by description", "postgresql", 1, 1},
@@ -313,7 +253,7 @@ func TestAPI_SearchDevices(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			resp, err := http.Get(ts.URL() + "/api/search?q=" + tt.query)
+			resp, err := http.Get(ts.URL() + "/api/devices/search?q=" + tt.query)
 			if err != nil {
 				t.Fatalf("Failed to search: %v", err)
 			}
@@ -410,7 +350,7 @@ func TestAPI_ErrorHandling(t *testing.T) {
 	})
 
 	t.Run("SearchMissingQuery", func(t *testing.T) {
-		resp, err := http.Get(ts.URL() + "/api/search")
+		resp, err := http.Get(ts.URL() + "/api/devices/search") // fixed
 		if err != nil {
 			t.Fatalf("Failed to make request: %v", err)
 		}
@@ -568,7 +508,7 @@ func BenchmarkAPI_SearchDevices(b *testing.B) {
 	b.ReportAllocs()
 
 	for i := 0; i < b.N; i++ {
-		resp, err := http.Get(ts.URL() + "/api/search?q=server")
+		resp, err := http.Get(ts.URL() + "/api/devices/search?q=server")
 		if err != nil {
 			b.Fatalf("Request failed: %v", err)
 		}

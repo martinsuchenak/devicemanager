@@ -30,6 +30,24 @@ func TestMigrateToV6(t *testing.T) {
 
 	// Manually set up schema up to V5
 	_, err = db.Exec(`
+        CREATE TABLE datacenters (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL UNIQUE,
+            location TEXT,
+            description TEXT,
+            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE TABLE networks (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL UNIQUE,
+            subnet TEXT NOT NULL,
+            datacenter_id TEXT NOT NULL,
+            description TEXT,
+            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (datacenter_id) REFERENCES datacenters(id) ON DELETE CASCADE
+        );
         CREATE TABLE devices (
             id TEXT PRIMARY KEY,
             name TEXT NOT NULL,
@@ -99,7 +117,7 @@ func TestMigrateToV6(t *testing.T) {
 		db.Close()
 		t.Fatal(err)
 	}
-	
+
 	db.Close()
 
 	// Initialize Storage

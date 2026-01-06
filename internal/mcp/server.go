@@ -3,11 +3,11 @@ package mcp
 import (
 	"context"
 	"fmt"
-	"log"
 	"net/http"
 	"strings"
 	"time"
 
+	"github.com/martinsuchenak/rackd/internal/log"
 	"github.com/martinsuchenak/rackd/internal/model"
 	"github.com/martinsuchenak/rackd/internal/storage"
 	"github.com/paularlott/mcp"
@@ -237,22 +237,31 @@ func (s *Server) registerTools() {
 
 // HandleRequest handles MCP HTTP requests with optional bearer token authentication
 func (s *Server) HandleRequest(w http.ResponseWriter, r *http.Request) {
+	log.Debug("MCP request received", "method", r.Method, "path", r.URL.Path, "remote_addr", r.RemoteAddr)
+
 	// Check bearer token if configured
 	if s.bearerToken != "" {
+		log.Debug("MCP authentication required")
 		auth := r.Header.Get("Authorization")
 		if auth == "" {
+			log.Warn("MCP request missing Authorization header", "remote_addr", r.RemoteAddr)
 			http.Error(w, "Unauthorized: Missing Authorization header", http.StatusUnauthorized)
 			return
 		}
 		if !strings.HasPrefix(auth, "Bearer ") {
+			log.Warn("MCP request invalid Authorization format", "remote_addr", r.RemoteAddr)
 			http.Error(w, "Unauthorized: Invalid Authorization format", http.StatusUnauthorized)
 			return
 		}
 		token := strings.TrimPrefix(auth, "Bearer ")
 		if token != s.bearerToken {
+			log.Warn("MCP request invalid token", "remote_addr", r.RemoteAddr)
 			http.Error(w, "Unauthorized: Invalid token", http.StatusUnauthorized)
 			return
 		}
+		log.Debug("MCP request authenticated successfully")
+	} else {
+		log.Debug("MCP request without authentication")
 	}
 
 	s.mcpServer.HandleRequest(w, r)
@@ -263,8 +272,11 @@ func (s *Server) HandleRequest(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleDeviceSave(ctx context.Context, req *mcp.ToolRequest) (*mcp.ToolResponse, error) {
 	name, err := req.String("name")
 	if err != nil {
+		log.Warn("MCP device save - missing name", "error", err)
 		return nil, mcp.NewToolErrorInvalidParams("name is required: " + err.Error())
 	}
+
+	log.Debug("MCP device save request", "name", name)
 
 	// Check if this is an update (id provided) or create
 	id, _ := req.String("id")
@@ -272,12 +284,14 @@ func (s *Server) handleDeviceSave(ctx context.Context, req *mcp.ToolRequest) (*m
 	isUpdate := false
 
 	if id != "" {
+		log.Debug("Checking for existing device", "id", id)
 		// Try to get existing device
 		existingDevice, err := s.storage.GetDevice(id)
 		if err == nil {
 			// Device exists, update it
 			device = existingDevice
 			isUpdate = true
+			log.Debug("Found existing device for update", "id", id, "name", existingDevice.Name)
 		}
 	}
 
@@ -328,9 +342,11 @@ func (s *Server) handleDeviceSave(ctx context.Context, req *mcp.ToolRequest) (*m
 		}
 
 		if err := s.storage.UpdateDevice(device); err != nil {
+			log.Error("MCP device update failed", "error", err, "id", device.ID, "name", device.Name)
 			return nil, mcp.NewToolErrorInternal("failed to update device: " + err.Error())
 		}
 
+		log.Info("MCP device updated successfully", "id", device.ID, "name", device.Name)
 		return mcp.NewToolResponseText(fmt.Sprintf("Device updated: %s (ID: %s)", device.Name, device.ID)), nil
 	}
 
@@ -355,23 +371,29 @@ func (s *Server) handleDeviceSave(ctx context.Context, req *mcp.ToolRequest) (*m
 	}
 
 	if err := s.storage.CreateDevice(device); err != nil {
+		log.Error("MCP device creation failed", "error", err, "name", device.Name)
 		return nil, mcp.NewToolErrorInternal("failed to create device: " + err.Error())
 	}
 
+	log.Info("MCP device created successfully", "id", device.ID, "name", device.Name)
 	return mcp.NewToolResponseText(fmt.Sprintf("Device created: %s (ID: %s)", device.Name, device.ID)), nil
 }
 
 func (s *Server) handleDeviceGet(ctx context.Context, req *mcp.ToolRequest) (*mcp.ToolResponse, error) {
 	id, err := req.String("id")
 	if err != nil {
+		log.Warn("MCP device get - missing ID", "error", err)
 		return nil, mcp.NewToolErrorInvalidParams("id is required: " + err.Error())
 	}
 
+	log.Debug("MCP device get request", "id", id)
 	device, err := s.storage.GetDevice(id)
 	if err != nil {
+		log.Error("MCP device get failed", "error", err, "id", id)
 		return nil, mcp.NewToolErrorInternal("device not found: " + err.Error())
 	}
 
+	log.Info("MCP device retrieved successfully", "id", id, "name", device.Name)
 	return s.deviceToResponse(device), nil
 }
 
@@ -383,16 +405,20 @@ func (s *Server) handleDeviceList(ctx context.Context, req *mcp.ToolRequest) (*m
 	query, _ := req.String("query")
 	tags, _ := req.StringSlice("tags")
 
+	log.Debug("MCP device list request", "query", query, "tags", tags)
+
 	// Prioritize search query over tag filter
 	if query != "" {
 		devices, err = s.storage.SearchDevices(query)
 		if err != nil {
+			log.Error("MCP device search failed", "error", err, "query", query)
 			return nil, mcp.NewToolErrorInternal("failed to search devices: " + err.Error())
 		}
 		searchDescription = fmt.Sprintf("matching '%s'", query)
 	} else {
 		devices, err = s.storage.ListDevices(&model.DeviceFilter{Tags: tags})
 		if err != nil {
+			log.Error("MCP device list failed", "error", err, "tags", tags)
 			return nil, mcp.NewToolErrorInternal("failed to list devices: " + err.Error())
 		}
 		if len(tags) > 0 {
@@ -401,6 +427,8 @@ func (s *Server) handleDeviceList(ctx context.Context, req *mcp.ToolRequest) (*m
 			searchDescription = "in inventory"
 		}
 	}
+
+	log.Info("MCP device list completed", "count", len(devices), "query", query, "tags", tags)
 
 	if len(devices) == 0 {
 		if query != "" {
@@ -425,13 +453,17 @@ func (s *Server) handleDeviceList(ctx context.Context, req *mcp.ToolRequest) (*m
 func (s *Server) handleDeviceDelete(ctx context.Context, req *mcp.ToolRequest) (*mcp.ToolResponse, error) {
 	id, err := req.String("id")
 	if err != nil {
+		log.Warn("MCP device delete - missing ID", "error", err)
 		return nil, mcp.NewToolErrorInvalidParams("id is required: " + err.Error())
 	}
 
+	log.Debug("MCP device delete request", "id", id)
 	if err := s.storage.DeleteDevice(id); err != nil {
+		log.Error("MCP device deletion failed", "error", err, "id", id)
 		return nil, mcp.NewToolErrorInternal("failed to delete device: " + err.Error())
 	}
 
+	log.Info("MCP device deleted successfully", "id", id)
 	return mcp.NewToolResponseText("Device deleted successfully"), nil
 }
 
@@ -441,16 +473,22 @@ func (s *Server) handleDatacenterList(ctx context.Context, req *mcp.ToolRequest)
 	// Check if storage supports datacenters
 	dcStorage, ok := s.storage.(storage.DatacenterStorage)
 	if !ok {
+		log.Debug("MCP datacenter list - storage not supported")
 		return mcp.NewToolResponseText("Datacenters are not supported by the current storage backend. Use SQLite storage to enable datacenter management."), nil
 	}
 
 	name, _ := req.String("name")
+	log.Debug("MCP datacenter list request", "name", name)
+
 	filter := &model.DatacenterFilter{Name: name}
 
 	datacenters, err := dcStorage.ListDatacenters(filter)
 	if err != nil {
+		log.Error("MCP datacenter list failed", "error", err, "name", name)
 		return nil, mcp.NewToolErrorInternal("failed to list datacenters: " + err.Error())
 	}
+
+	log.Info("MCP datacenter list completed", "count", len(datacenters), "name", name)
 
 	if len(datacenters) == 0 {
 		return mcp.NewToolResponseText("No datacenters found"), nil
@@ -469,35 +507,44 @@ func (s *Server) handleDatacenterList(ctx context.Context, req *mcp.ToolRequest)
 func (s *Server) handleDatacenterGet(ctx context.Context, req *mcp.ToolRequest) (*mcp.ToolResponse, error) {
 	dcStorage, ok := s.storage.(storage.DatacenterStorage)
 	if !ok {
+		log.Debug("MCP datacenter get - storage not supported")
 		return mcp.NewToolResponseText("Datacenters are not supported by the current storage backend. Use SQLite storage to enable datacenter management."), nil
 	}
 
 	id, err := req.String("id")
 	if err != nil {
+		log.Warn("MCP datacenter get - missing ID", "error", err)
 		return nil, mcp.NewToolErrorInvalidParams("id is required: " + err.Error())
 	}
 
+	log.Debug("MCP datacenter get request", "id", id)
 	datacenter, err := dcStorage.GetDatacenter(id)
 	if err != nil {
+		log.Error("MCP datacenter get failed", "error", err, "id", id)
 		return nil, mcp.NewToolErrorInternal("datacenter not found: " + err.Error())
 	}
 
+	log.Info("MCP datacenter retrieved successfully", "id", id, "name", datacenter.Name)
 	return mcp.NewToolResponseText(s.formatDatacenterSummary(datacenter)), nil
 }
 
 func (s *Server) handleDatacenterSave(ctx context.Context, req *mcp.ToolRequest) (*mcp.ToolResponse, error) {
 	dcStorage, ok := s.storage.(storage.DatacenterStorage)
 	if !ok {
+		log.Debug("MCP datacenter save - storage not supported")
 		return mcp.NewToolResponseText("Datacenters are not supported by the current storage backend. Use SQLite storage to enable datacenter management."), nil
 	}
 
 	name, err := req.String("name")
 	if err != nil {
+		log.Warn("MCP datacenter save - missing name", "error", err)
 		return nil, mcp.NewToolErrorInvalidParams("name is required: " + err.Error())
 	}
 
-	// Check if this is an update (id provided) or create
 	id, _ := req.String("id")
+	log.Debug("MCP datacenter save request", "name", name, "id", id)
+
+	// Check if this is an update (id provided) or create
 	var datacenter *model.Datacenter
 	isUpdate := false
 
@@ -508,6 +555,7 @@ func (s *Server) handleDatacenterSave(ctx context.Context, req *mcp.ToolRequest)
 			// Datacenter exists, update it
 			datacenter = existingDC
 			isUpdate = true
+			log.Debug("Found existing datacenter for update", "id", id, "name", existingDC.Name)
 		}
 	}
 
@@ -525,9 +573,11 @@ func (s *Server) handleDatacenterSave(ctx context.Context, req *mcp.ToolRequest)
 		}
 
 		if err := dcStorage.UpdateDatacenter(datacenter); err != nil {
+			log.Error("MCP datacenter update failed", "error", err, "id", datacenter.ID, "name", datacenter.Name)
 			return nil, mcp.NewToolErrorInternal("failed to update datacenter: " + err.Error())
 		}
 
+		log.Info("MCP datacenter updated successfully", "id", datacenter.ID, "name", datacenter.Name)
 		return mcp.NewToolResponseText(fmt.Sprintf("Datacenter updated: %s (ID: %s)", datacenter.Name, datacenter.ID)), nil
 	}
 
@@ -539,9 +589,11 @@ func (s *Server) handleDatacenterSave(ctx context.Context, req *mcp.ToolRequest)
 	}
 
 	if err := dcStorage.CreateDatacenter(datacenter); err != nil {
+		log.Error("MCP datacenter creation failed", "error", err, "name", datacenter.Name)
 		return nil, mcp.NewToolErrorInternal("failed to create datacenter: " + err.Error())
 	}
 
+	log.Info("MCP datacenter created successfully", "id", datacenter.ID, "name", datacenter.Name)
 	return mcp.NewToolResponseText(fmt.Sprintf("Datacenter created: %s (ID: %s)", datacenter.Name, datacenter.ID)), nil
 }
 
@@ -605,17 +657,23 @@ func (s *Server) handleNetworkList(ctx context.Context, req *mcp.ToolRequest) (*
 	// Check if storage supports networks
 	netStorage, ok := s.storage.(storage.NetworkStorage)
 	if !ok {
+		log.Debug("MCP network list - storage not supported")
 		return mcp.NewToolResponseText("Networks are not supported by the current storage backend. Use SQLite storage to enable network management."), nil
 	}
 
 	name, _ := req.String("name")
 	datacenterID, _ := req.String("datacenter_id")
+	log.Debug("MCP network list request", "name", name, "datacenter_id", datacenterID)
+
 	filter := &model.NetworkFilter{Name: name, DatacenterID: datacenterID}
 
 	networks, err := netStorage.ListNetworks(filter)
 	if err != nil {
+		log.Error("MCP network list failed", "error", err, "name", name, "datacenter_id", datacenterID)
 		return nil, mcp.NewToolErrorInternal("failed to list networks: " + err.Error())
 	}
+
+	log.Info("MCP network list completed", "count", len(networks), "name", name, "datacenter_id", datacenterID)
 
 	if len(networks) == 0 {
 		return mcp.NewToolResponseText("No networks found"), nil
@@ -634,19 +692,24 @@ func (s *Server) handleNetworkList(ctx context.Context, req *mcp.ToolRequest) (*
 func (s *Server) handleNetworkGet(ctx context.Context, req *mcp.ToolRequest) (*mcp.ToolResponse, error) {
 	netStorage, ok := s.storage.(storage.NetworkStorage)
 	if !ok {
+		log.Debug("MCP network get - storage not supported")
 		return mcp.NewToolResponseText("Networks are not supported by the current storage backend. Use SQLite storage to enable network management."), nil
 	}
 
 	id, err := req.String("id")
 	if err != nil {
+		log.Warn("MCP network get - missing ID", "error", err)
 		return nil, mcp.NewToolErrorInvalidParams("id is required: " + err.Error())
 	}
 
+	log.Debug("MCP network get request", "id", id)
 	network, err := netStorage.GetNetwork(id)
 	if err != nil {
+		log.Error("MCP network get failed", "error", err, "id", id)
 		return nil, mcp.NewToolErrorInternal("network not found: " + err.Error())
 	}
 
+	log.Info("MCP network retrieved successfully", "id", id, "name", network.Name)
 	return mcp.NewToolResponseText(s.formatNetworkSummary(network)), nil
 }
 
@@ -830,18 +893,23 @@ func (s *Server) handleNetworkGetPools(ctx context.Context, req *mcp.ToolRequest
 func (s *Server) handleAddRelationship(ctx context.Context, req *mcp.ToolRequest) (*mcp.ToolResponse, error) {
 	parentID, err := req.String("parent_id")
 	if err != nil {
+		log.Warn("MCP add relationship - missing parent ID", "error", err)
 		return nil, mcp.NewToolErrorInvalidParams("parent_id is required")
 	}
 
 	childID, err := req.String("child_id")
 	if err != nil {
+		log.Warn("MCP add relationship - missing child ID", "error", err)
 		return nil, mcp.NewToolErrorInvalidParams("child_id is required")
 	}
 
 	relType, err := req.String("relationship_type")
 	if err != nil {
+		log.Warn("MCP add relationship - missing type", "error", err)
 		return nil, mcp.NewToolErrorInvalidParams("relationship_type is required")
 	}
+
+	log.Debug("MCP add relationship request", "parent_id", parentID, "child_id", childID, "type", relType)
 
 	// Resolve device names to IDs if needed
 	parentDevice, err := s.storage.GetDevice(parentID)
@@ -863,9 +931,11 @@ func (s *Server) handleAddRelationship(ctx context.Context, req *mcp.ToolRequest
 	}
 
 	if err := relStorage.AddRelationship(parentDevice.ID, childDevice.ID, relType); err != nil {
+		log.Error("MCP add relationship failed", "error", err, "parent_id", parentDevice.ID, "child_id", childDevice.ID, "type", relType)
 		return nil, mcp.NewToolErrorInternal("failed to add relationship: " + err.Error())
 	}
 
+	log.Info("MCP relationship added successfully", "parent_id", parentDevice.ID, "parent_name", parentDevice.Name, "child_id", childDevice.ID, "child_name", childDevice.Name, "type", relType)
 	return mcp.NewToolResponseText(fmt.Sprintf("Relationship added: %s -> %s (%s)", parentDevice.Name, childDevice.Name, relType)), nil
 }
 
@@ -883,7 +953,7 @@ func (s *Server) handleGetRelationships(ctx context.Context, req *mcp.ToolReques
 
 	// Check if storage supports relationships
 	relStorage, ok := s.storage.(interface {
-		GetRelationships(deviceID string) ([]storage.Relationship, error)
+		GetRelationships(deviceID string) ([]model.DeviceRelationship, error)
 	})
 	if !ok {
 		return mcp.NewToolResponseText("Relationships are not supported by the current storage backend. Use SQLite storage to enable device relationships."), nil
@@ -914,7 +984,7 @@ func (s *Server) handleGetRelationships(ctx context.Context, req *mcp.ToolReques
 			childName = child.Name
 		}
 
-		result.WriteString(fmt.Sprintf("  %s -> %s (%s)\n", parentName, childName, rel.RelationshipType))
+		result.WriteString(fmt.Sprintf("  %s -> %s (%s)\n", parentName, childName, rel.Type))
 	}
 
 	return mcp.NewToolResponseText(result.String()), nil
@@ -1015,19 +1085,25 @@ func (s *Server) handleRemoveRelationship(ctx context.Context, req *mcp.ToolRequ
 func (s *Server) handleGetNextPoolIP(ctx context.Context, req *mcp.ToolRequest) (*mcp.ToolResponse, error) {
 	poolID, err := req.String("pool_id")
 	if err != nil {
+		log.Warn("MCP get next pool IP - missing pool ID", "error", err)
 		return nil, mcp.NewToolErrorInvalidParams("pool_id is required: " + err.Error())
 	}
 
+	log.Debug("MCP get next pool IP request", "pool_id", poolID)
+
 	poolStorage, ok := s.storage.(storage.NetworkPoolStorage)
 	if !ok {
+		log.Debug("MCP get next pool IP - storage not supported")
 		return mcp.NewToolResponseText("Network pools are not supported by the current storage backend. Use SQLite storage to enable network pool management."), nil
 	}
 
 	ip, err := poolStorage.GetNextAvailableIP(poolID)
 	if err != nil {
+		log.Error("MCP get next pool IP failed", "error", err, "pool_id", poolID)
 		return nil, mcp.NewToolErrorInternal("failed to get next IP: " + err.Error())
 	}
 
+	log.Info("MCP next pool IP retrieved successfully", "pool_id", poolID, "ip", ip)
 	return mcp.NewToolResponseText(ip), nil
 }
 
@@ -1175,15 +1251,15 @@ func (s *Server) GetHTTPHandler() http.HandlerFunc {
 
 // LogStartup logs MCP server startup information
 func (s *Server) LogStartup() {
-	log.Println("MCP Server: rackd v1.0.0")
+	log.Info("MCP Server initialized", "version", "1.0.0")
 	if s.bearerToken != "" {
-		log.Println("MCP authentication: Bearer token required")
+		log.Info("MCP authentication enabled", "type", "Bearer token")
 	} else {
-		log.Println("MCP authentication: Disabled")
+		log.Info("MCP authentication disabled")
 	}
 	tools := s.mcpServer.ListTools()
-	log.Printf("MCP tools registered: %d", len(tools))
+	log.Info("MCP tools registered", "count", len(tools))
 	for _, tool := range tools {
-		log.Printf("  - %s: %s", tool.Name, tool.Description)
+		log.Debug("MCP tool registered", "name", tool.Name, "description", tool.Description)
 	}
 }

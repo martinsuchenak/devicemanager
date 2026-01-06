@@ -1,8 +1,7 @@
 # Rackd Makefile
 
 # Variables
-BINARY_SERVER=rackd
-BINARY_CLI=rackd-cli
+BINARY=rackd
 GO=go
 GOFLAGS=-v
 DOCKER=docker
@@ -14,7 +13,6 @@ LDFLAGS=-ldflags="-s -w"
 CGO_ENABLED=0
 
 # Directories
-CMD_DIR=./cmd
 BUILD_DIR=./build
 DOCKERFILE=./Dockerfile
 WEBUI_DIR=./webui
@@ -33,49 +31,44 @@ NOMAD_JOB=deployment/nomad/rackd.nomad
 # Default target
 all: build
 
-## build: Build both server and CLI binaries (includes UI assets)
-build: ui-build server cli
+## build: Build binary (includes UI assets)
+build: ui-build binary
 
-## server: Build server binary
-server:
-	@echo "Building server..."
+## binary: Build main binary
+binary:
+	@echo "Building binary..."
 	@mkdir -p $(BUILD_DIR)
-	CGO_ENABLED=1 $(GO) build $(GOFLAGS) $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_SERVER) $(CMD_DIR)/server
+	CGO_ENABLED=1 $(GO) build $(GOFLAGS) $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY) .
 
-## cli: Build CLI binary
-cli:
-	@echo "Building CLI..."
-	@mkdir -p $(BUILD_DIR)
-	CGO_ENABLED=1 $(GO) build $(GOFLAGS) $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_CLI) $(CMD_DIR)/cli
+## server: Alias for binary (backward compatibility)
+server: binary
 
-## build-linux: Build binaries for Linux (for Docker)
+## cli: Alias for binary (backward compatibility)
+cli: binary
+
+## build-linux: Build binary for Linux (for Docker)
 build-linux:
-	@echo "Building Linux binaries..."
+	@echo "Building Linux binary..."
 	@mkdir -p $(BUILD_DIR)
-	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 $(GO) build $(GOFLAGS) $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_SERVER) $(CMD_DIR)/server
-	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 $(GO) build $(GOFLAGS) $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_CLI) $(CMD_DIR)/cli
+	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 $(GO) build $(GOFLAGS) $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY) .
 
-## install: Install binaries to $GOPATH/bin
+## install: Install binary to $GOPATH/bin
 install:
-	@echo "Installing binaries..."
-	$(GO) install $(GOFLAGS) $(CMD_DIR)/server
-	$(GO) install $(GOFLAGS) $(CMD_DIR)/cli
+	@echo "Installing binary..."
+	$(GO) install $(GOFLAGS) .
 
 ## clean: Remove build artifacts
 clean: ui-clean
 	@echo "Cleaning..."
 	$(GO) clean
 	rm -rf $(BUILD_DIR)
-	rm -f $(BINARY_SERVER) $(BINARY_CLI)
+	rm -f $(BINARY)
 
 ## test: Run tests
-test:
+test: ui-build
 	@echo "Running tests..."
-	@$(GO) test -v -race -coverprofile=coverage.out -covermode=atomic ./... || \
+	@$(GO) test -v -race ./... || \
 		{ echo "Tests failed"; exit 1; }
-	@-$(GO) tool cover -html=coverage.out -o coverage.html
-	@echo ""
-	@echo "Coverage report generated: coverage.html"
 
 ## test-short: Run short tests only
 test-short:
@@ -183,14 +176,14 @@ nomad-status:
 	nomad alloc status -job rackd
 
 ## run-server: Run server locally
-run-server: server
+run-server: binary
 	@echo "Starting server..."
-	$(BUILD_DIR)/$(BINARY_SERVER)
+	$(BUILD_DIR)/$(BINARY) server
 
 ## run-cli: Run CLI locally
-run-cli:
+run-cli: binary
 	@echo "Running CLI..."
-	$(GO) run $(CMD_DIR)/cli
+	$(BUILD_DIR)/$(BINARY)
 
 ## mod-verify: Verify dependencies
 mod-verify:
@@ -212,7 +205,7 @@ dev:
 		air; \
 	else \
 		echo "air not installed. Install with: go install github.com/cosmtrek/air@latest"; \
-		$(GO) run $(CMD_DIR)/server; \
+		$(GO) run . server; \
 	fi
 
 ## generate: Run go generate
