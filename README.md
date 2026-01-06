@@ -19,8 +19,9 @@ A Go-based device tracking application with MCP server support, web UI, and CLI.
 
 ### Prerequisites
 
-- **Go 1.25+** for building the server and CLI
-- **bun** (for building web UI assets - only required for development)
+- **Go 1.25+** for building the application
+- **bun** for building web UI assets (only required for development)
+- **make** for build automation
 
 ### Building
 
@@ -30,8 +31,7 @@ make build
 
 # Or build separately
 make ui-build    # Build web UI assets
-make server      # Build server binary
-make cli         # Build CLI binary
+make binary      # Build main binary
 ```
 
 The build process automatically:
@@ -39,13 +39,13 @@ The build process automatically:
 1. Installs UI dependencies with bun
 2. Builds Tailwind CSS and bundles JavaScript
 3. Embeds UI assets into the Go binary
-4. Compiles the server and CLI
+4. Compiles the single binary with both server and CLI commands
 
 ### Running
 
 ```bash
 # Run server with default settings (SQLite storage)
-./build/rackd
+./build/rackd server
 
 # Or use the Makefile target
 make run-server
@@ -100,32 +100,33 @@ cp .env.example .env
 ### CLI Flags
 
 ```bash
-./rackd -data-dir /custom/data -addr :9000
+./rackd server --data-dir /custom/data --addr :9000
 ```
 
 | Flag | ENV Variable | Default | Description |
 |------|--------------|---------|-------------|
-| `-data-dir` | `RACKD_DATA_DIR` | `./data` | Directory for SQLite database |
-| `-addr` | `RACKD_LISTEN_ADDR` | `:8080` | Server listen address |
-| `-token` | `RACKD_BEARER_TOKEN` | (none) | MCP authentication token |
+| `--data-dir` | `RACKD_DATA_DIR` | `./data` | Directory for SQLite database |
+| `--addr` | `RACKD_LISTEN_ADDR` | `:8080` | Server listen address |
+| `--mcp-token` | `RACKD_BEARER_TOKEN` | (none) | MCP authentication token |
+| `--api-token` | `RACKD_API_TOKEN` | (none) | API authentication token |
 
 ### Configuration Examples
 
 ```bash
 # Use defaults (SQLite storage, :8080, ./data)
-./rackd
+./rackd server
 
 # Use .env file for configuration
 cp .env.example .env
-./rackd
+./rackd server
 
 # Override specific settings with CLI flags
-./rackd -data-dir /mnt/data -addr :9999
+./rackd server --data-dir /mnt/data --addr :9999
 
 # Use environment variables
 export RACKD_DATA_DIR=/custom/data
 export RACKD_LISTEN_ADDR=:8080
-./rackd
+./rackd server
 ```
 
 ### Storage
@@ -189,45 +190,85 @@ Supported relationship types:
 ## CLI Usage
 
 ```bash
-# Build CLI
-make cli
+# Build the binary
+make build
 
-# Add a device
-./build/rackd-cli add \
+# Server commands
+./build/rackd server --help
+./build/rackd server --addr :8080 --data-dir ./data
+
+# Device management
+./build/rackd device add \
   --name "web-server-01" \
   --make-model "Dell PowerEdge R740" \
   --os "Ubuntu 22.04" \
   --datacenter-id "dc-123" \
   --tags "server,production,web" \
-  --domains "example.com,www.example.com"
+  --domains "example.com,www.example.com" \
+  --ip "192.168.1.10" \
+  --port 443 \
+  --network-id "net-123" \
+  --pool-id "pool-456"
 
 # In single datacenter mode, --datacenter-id is optional
-./build/rackd-cli add \
+./build/rackd device add \
   --name "server-01" \
   --make-model "Dell R740"
 
 # List all devices
-./build/rackd-cli list
+./build/rackd device list
 
 # Filter by tags
-./build/rackd-cli list --filter server,production
+./build/rackd device list --filter server,production
 
 # Get device details
-./build/rackd-cli get web-server-01
+./build/rackd device get web-server-01
 
 # Search devices
-./build/rackd-cli search "dell"
+./build/rackd device search "dell"
 
 # Update a device
-./build/rackd-cli update web-server-01 \
+./build/rackd device update web-server-01 \
   --datacenter-id "dc-456" \
   --tags "server,production,web,backend"
 
 # Delete a device
-./build/rackd-cli delete web-server-01
+./build/rackd device delete web-server-01
 
-# Use local storage instead of server
-./build/rackd-cli --local add --name "local-device"
+# Network management
+./build/rackd network add \
+  --name "Production Network" \
+  --subnet "192.168.1.0/24" \
+  --datacenter-id "dc-123"
+
+./build/rackd network list
+./build/rackd network get net-123
+./build/rackd network devices net-123
+
+# Network pool management
+./build/rackd network pools add net-123 \
+  --name "DHCP Range" \
+  --start-ip "192.168.1.100" \
+  --end-ip "192.168.1.200" \
+  --description "Dynamic allocation pool"
+
+./build/rackd network pools list net-123
+./build/rackd network pools get pool-456
+./build/rackd network pools next-ip pool-456
+./build/rackd network pools update pool-456 --description "Updated pool"
+./build/rackd network pools delete pool-456
+
+# Datacenter management
+./build/rackd datacenter add \
+  --name "US-West-1" \
+  --location "San Francisco, CA"
+
+./build/rackd datacenter list
+./build/rackd datacenter get dc-123
+./build/rackd datacenter devices dc-123
+
+# Use remote server instead of local storage
+./build/rackd device list --server http://remote-rackd:8080
 ```
 
 ## REST API
@@ -672,18 +713,28 @@ Built assets are embedded into the Go binary at compile time using `go:embed`.
 
 ```
 rackd/
+├── main.go              # Root command with subcommands
 ├── cmd/
-│   ├── server/          # HTTP server + MCP endpoint
-│   └── cli/             # CLI tool
+│   ├── server/          # Server command
+│   ├── device/          # Device management commands
+│   ├── network/         # Network management commands
+│   └── datacenter/      # Datacenter management commands
 ├── internal/
 │   ├── config/          # Configuration management
-│   ├── storage/         # Storage backends (SQLite + file)
+│   ├── log/             # Structured logging
+│   ├── storage/         # Storage backends (SQLite)
 │   ├── model/           # Data models
 │   ├── api/             # REST API handlers
 │   ├── mcp/             # MCP server implementation
 │   └── ui/              # Web UI assets (embedded)
 ├── webui/
-│   ├── src/             # UI source files
+│   ├── src/             # UI source files (modular)
+│   │   ├── app.js       # Main entry point
+│   │   ├── api.js       # HTTP utilities
+│   │   ├── toast.js     # Notification system
+│   │   ├── datacenter.js # Datacenter management
+│   │   ├── network.js   # Network management
+│   │   └── device.js    # Device management
 │   ├── dist/            # Built assets (gitignored)
 │   └── package.json     # UI dependencies
 ├── deployment/
@@ -697,21 +748,24 @@ rackd/
 
 - `modernc.org/sqlite` - Pure Go SQLite driver
 - `github.com/paularlott/mcp` - MCP server
+- `github.com/paularlott/cli` - CLI framework with env/flag support
+- `github.com/paularlott/logger` - Structured logging
+- `github.com/joho/godotenv` - .env file loading
 - `alpinejs` - Web UI framework (dev dependency)
 - `tailwindcss` - UI styling (dev dependency)
 
 ### Makefile Targets
 
 ```bash
-make build          # Build everything (server + CLI + UI)
-make server         # Build server binary
-make cli            # Build CLI binary
+make build          # Build everything (binary + UI)
+make binary         # Build main binary
 make ui-build       # Build UI assets
 make ui-dev         # Watch UI assets for development
 make ui-clean       # Remove UI build artifacts
 make clean          # Remove all build artifacts
 make test           # Run tests
 make docker-build   # Build Docker image
+make run-server     # Run server locally
 ```
 
 ## License

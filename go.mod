@@ -4,7 +4,9 @@ go 1.25.3
 
 require (
 	github.com/google/uuid v1.6.0
+	github.com/joho/godotenv v1.5.1
 	github.com/paularlott/cli v0.6.0
+	github.com/paularlott/logger v0.3.0
 	github.com/paularlott/mcp v0.7.1
 	modernc.org/sqlite v1.42.2
 )
