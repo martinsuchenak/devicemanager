@@ -707,6 +707,7 @@ Alpine.data('poolManager', () => ({
         // Listen for events to open manager for a specific network
         window.addEventListener('manage-pools', (e) => {
             this.networkId = e.detail.networkId;
+            this.showPoolForm = false;
             this.loadPools();
             this.showModal = true;
         });
