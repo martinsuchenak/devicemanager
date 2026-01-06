@@ -35,3 +35,11 @@ func Error(msg string, keysAndValues ...any) {
 func Debug(msg string, keysAndValues ...any) {
 	defaultLogger.Debug(msg, keysAndValues...)
 }
+
+func Warn(msg string, keysAndValues ...any) {
+	defaultLogger.Warn(msg, keysAndValues...)
+}
+
+func Trace(msg string, keysAndValues ...any) {
+	defaultLogger.Trace(msg, keysAndValues...)
+}

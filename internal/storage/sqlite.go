@@ -16,6 +16,7 @@ import (
 
 	_ "modernc.org/sqlite"
 
+	"github.com/martinsuchenak/rackd/internal/log"
 	"github.com/martinsuchenak/rackd/internal/model"
 )
 
@@ -167,6 +168,8 @@ func (ss *SQLiteStorage) ListDevices(filter *model.DeviceFilter) ([]model.Device
 	ss.mu.RLock()
 	defer ss.mu.RUnlock()
 
+	log.Debug("Listing devices from storage", "filter_tags", filter != nil && len(filter.Tags) > 0)
+
 	query := `
 		SELECT d.id, d.name, d.description, d.make_model, d.os, d.datacenter_id, d.username, d.location,
 		       d.created_at, d.updated_at
@@ -197,6 +200,7 @@ func (ss *SQLiteStorage) ListDevices(filter *model.DeviceFilter) ([]model.Device
 		devices = ss.filterByTags(devices, filter.Tags)
 	}
 
+	log.Info("Listed devices from storage", "count", len(devices))
 	return devices, nil
 }
 
@@ -250,6 +254,8 @@ func (ss *SQLiteStorage) GetDevice(id string) (*model.Device, error) {
 func (ss *SQLiteStorage) CreateDevice(device *model.Device) error {
 	ss.mu.Lock()
 	defer ss.mu.Unlock()
+
+	log.Debug("Creating device in storage", "id", device.ID, "name", device.Name)
 
 	now := time.Now()
 	device.CreatedAt = now
@@ -307,6 +313,7 @@ func (ss *SQLiteStorage) CreateDevice(device *model.Device) error {
 		return err
 	}
 
+	log.Info("Device created in storage", "id", device.ID, "name", device.Name, "addresses_count", len(device.Addresses))
 	return tx.Commit()
 }
 
@@ -392,16 +399,21 @@ func (ss *SQLiteStorage) DeleteDevice(id string) error {
 	ss.mu.Lock()
 	defer ss.mu.Unlock()
 
+	log.Debug("Deleting device from storage", "id", id)
+
 	result, err := ss.db.Exec("DELETE FROM devices WHERE id = ?", id)
 	if err != nil {
+		log.Error("Failed to delete device from storage", "error", err, "id", id)
 		return fmt.Errorf("deleting device: %w", err)
 	}
 
 	rows, _ := result.RowsAffected()
 	if rows == 0 {
+		log.Warn("Device not found for deletion", "id", id)
 		return ErrDeviceNotFound
 	}
 
+	log.Info("Device deleted from storage", "id", id)
 	return nil
 }
 

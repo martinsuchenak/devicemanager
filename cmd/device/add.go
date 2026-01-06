@@ -40,8 +40,11 @@ func AddCommand() *cli.Command {
 			&cli.StringFlag{Name: "api-token", Usage: "API authentication token", EnvVars: []string{"RACKD_API_TOKEN"}},
 		},
 		Run: func(ctx context.Context, cmd *cli.Command) error {
+			deviceName := cmd.GetString("name")
+			log.Debug("Adding device", "name", deviceName, "server", cmd.GetString("server"))
+			
 			device := &model.Device{
-				Name:         cmd.GetString("name"),
+				Name:         deviceName,
 				Description:  cmd.GetString("description"),
 				MakeModel:    cmd.GetString("make-model"),
 				OS:           cmd.GetString("os"),
@@ -73,21 +76,26 @@ func AddCommand() *cli.Command {
 			// Make API call
 			data, err := json.Marshal(device)
 			if err != nil {
+				log.Error("Failed to marshal device data", "error", err, "name", deviceName)
 				return err
 			}
 
+			log.Debug("Sending device creation request", "name", deviceName)
 			resp, err := makeRequest("POST", cmd.GetString("server")+"/api/devices", cmd.GetString("api-token"), strings.NewReader(string(data)))
 			if err != nil {
+				log.Error("Failed to connect to server", "error", err, "name", deviceName)
 				return fmt.Errorf("failed to connect to server: %w", err)
 			}
 			defer resp.Body.Close()
 
 			if resp.StatusCode != http.StatusCreated {
 				body, _ := io.ReadAll(resp.Body)
+				log.Error("Server returned error", "status", resp.StatusCode, "body", string(body), "name", deviceName)
 				return fmt.Errorf("server error: %s", string(body))
 			}
 
 			if err := json.NewDecoder(resp.Body).Decode(device); err != nil {
+				log.Error("Failed to decode response", "error", err, "name", deviceName)
 				return err
 			}
 

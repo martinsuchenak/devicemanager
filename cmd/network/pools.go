@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/martinsuchenak/rackd/internal/log"
 	"github.com/martinsuchenak/rackd/internal/model"
 	"github.com/paularlott/cli"
 )
@@ -42,25 +43,32 @@ func PoolListCommand() *cli.Command {
 		},
 		Run: func(ctx context.Context, cmd *cli.Command) error {
 			networkID := cmd.GetStringArg("network-id")
+			log.Debug("Listing network pools", "network_id", networkID)
+			
 			client := &http.Client{Timeout: 30 * time.Second}
 			resp, err := client.Get(cmd.GetString("server") + "/api/networks/" + networkID + "/pools")
 			if err != nil {
+				log.Error("Failed to connect to server for pools list", "error", err, "network_id", networkID)
 				return fmt.Errorf("failed to connect to server: %w", err)
 			}
 			defer resp.Body.Close()
 
 			if resp.StatusCode == http.StatusNotFound {
+				log.Warn("Network not found for pools list", "network_id", networkID)
 				return fmt.Errorf("network not found")
 			}
 			if resp.StatusCode != http.StatusOK {
+				log.Error("Server returned error for pools list", "status", resp.Status, "network_id", networkID)
 				return fmt.Errorf("server error: %s", resp.Status)
 			}
 
 			var pools []model.NetworkPool
 			if err := json.NewDecoder(resp.Body).Decode(&pools); err != nil {
+				log.Error("Failed to decode pools response", "error", err, "network_id", networkID)
 				return err
 			}
 
+			log.Info("Listed network pools", "network_id", networkID, "count", len(pools))
 			printPools(pools)
 			return nil
 		},
@@ -84,9 +92,12 @@ func PoolAddCommand() *cli.Command {
 		},
 		Run: func(ctx context.Context, cmd *cli.Command) error {
 			networkID := cmd.GetStringArg("network-id")
+			poolName := cmd.GetString("name")
+			log.Debug("Adding network pool", "network_id", networkID, "name", poolName)
+			
 			pool := &model.NetworkPool{
 				NetworkID:   networkID,
-				Name:        cmd.GetString("name"),
+				Name:        poolName,
 				StartIP:     cmd.GetString("start-ip"),
 				EndIP:       cmd.GetString("end-ip"),
 				Description: cmd.GetString("description"),
@@ -94,25 +105,30 @@ func PoolAddCommand() *cli.Command {
 
 			data, err := json.Marshal(pool)
 			if err != nil {
+				log.Error("Failed to marshal pool data", "error", err, "name", poolName)
 				return err
 			}
 
 			client := &http.Client{Timeout: 30 * time.Second}
 			resp, err := client.Post(cmd.GetString("server")+"/api/networks/"+networkID+"/pools", "application/json", strings.NewReader(string(data)))
 			if err != nil {
+				log.Error("Failed to connect to server for pool add", "error", err, "name", poolName)
 				return fmt.Errorf("failed to connect to server: %w", err)
 			}
 			defer resp.Body.Close()
 
 			if resp.StatusCode != http.StatusCreated {
 				body, _ := io.ReadAll(resp.Body)
+				log.Error("Server returned error for pool add", "status", resp.StatusCode, "body", string(body), "name", poolName)
 				return fmt.Errorf("server error: %s", string(body))
 			}
 
 			if err := json.NewDecoder(resp.Body).Decode(pool); err != nil {
+				log.Error("Failed to decode pool response", "error", err, "name", poolName)
 				return err
 			}
 
+			log.Info("Pool created successfully", "id", pool.ID, "name", pool.Name)
 			fmt.Printf("Pool created: %s (ID: %s)\n", pool.Name, pool.ID)
 			return nil
 		},

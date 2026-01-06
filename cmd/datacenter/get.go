@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/martinsuchenak/rackd/internal/log"
 	"github.com/martinsuchenak/rackd/internal/model"
 	"github.com/paularlott/cli"
 )
@@ -24,25 +25,32 @@ func GetCommand() *cli.Command {
 		},
 		Run: func(ctx context.Context, cmd *cli.Command) error {
 			id := cmd.GetStringArg("id")
+			log.Debug("Getting datacenter", "id", id, "server", cmd.GetString("server"))
+			
 			client := &http.Client{Timeout: 30 * time.Second}
 			resp, err := client.Get(cmd.GetString("server") + "/api/datacenters/" + id)
 			if err != nil {
+				log.Error("Failed to connect to server for datacenter get", "error", err, "id", id)
 				return fmt.Errorf("failed to connect to server: %w", err)
 			}
 			defer resp.Body.Close()
 
 			if resp.StatusCode == http.StatusNotFound {
+				log.Warn("Datacenter not found", "id", id)
 				return fmt.Errorf("datacenter not found")
 			}
 			if resp.StatusCode != http.StatusOK {
+				log.Error("Server returned error for datacenter get", "status", resp.Status, "id", id)
 				return fmt.Errorf("server error: %s", resp.Status)
 			}
 
 			var datacenter model.Datacenter
 			if err := json.NewDecoder(resp.Body).Decode(&datacenter); err != nil {
+				log.Error("Failed to decode datacenter response", "error", err, "id", id)
 				return err
 			}
 
+			log.Info("Retrieved datacenter successfully", "id", id, "name", datacenter.Name)
 			printDatacenter(&datacenter)
 			return nil
 		},
