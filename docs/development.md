@@ -64,7 +64,6 @@ rackd/
 - `github.com/paularlott/mcp` - MCP server
 - `github.com/paularlott/cli` - CLI framework with env/flag support
 - `github.com/paularlott/logger` - Structured logging
-- `github.com/joho/godotenv` - .env file loading
 - `alpinejs` - Web UI framework (dev dependency)
 - `tailwindcss` - UI styling (dev dependency)
 

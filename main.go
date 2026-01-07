@@ -4,13 +4,13 @@ import (
 	"context"
 	"os"
 
-	"github.com/joho/godotenv"
 	"github.com/martinsuchenak/rackd/cmd/datacenter"
 	"github.com/martinsuchenak/rackd/cmd/device"
 	"github.com/martinsuchenak/rackd/cmd/network"
 	"github.com/martinsuchenak/rackd/cmd/server"
 	"github.com/martinsuchenak/rackd/internal/log"
 	"github.com/paularlott/cli"
+	"github.com/paularlott/cli/env"
 )
 
 var (
@@ -21,7 +21,7 @@ var (
 
 func main() {
 	// Load .env file if it exists
-	godotenv.Load()
+	env.Load()
 
 	// Initialize structured logging
 	log.Configure("info", "console")
