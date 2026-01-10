@@ -5,6 +5,7 @@ import './toast.js';
 import './datacenter.js';
 import './network.js';
 import './device.js';
+import './discovery.js';
 
 Alpine.plugin(focus);
 

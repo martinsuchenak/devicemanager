@@ -11,8 +11,10 @@ import (
 	"github.com/martinsuchenak/rackd/internal/config"
 	"github.com/martinsuchenak/rackd/internal/log"
 	"github.com/martinsuchenak/rackd/internal/mcp"
+	"github.com/martinsuchenak/rackd/internal/scanner"
 	"github.com/martinsuchenak/rackd/internal/storage"
 	"github.com/martinsuchenak/rackd/internal/ui"
+	"github.com/martinsuchenak/rackd/internal/worker"
 	"github.com/paularlott/cli"
 )
 
@@ -38,6 +40,44 @@ func Command() *cli.Command {
 			// Create API handler
 			apiHandler := api.NewHandler(store)
 
+			// Get discovery storage and create discovery handler
+			discoveryStore, ok := store.(storage.DiscoveryStorage)
+			var discoveryHandler *api.DiscoveryHandler
+			var discoveryScheduler *worker.Scheduler
+
+			if ok {
+				// Always create the scanner (needed for manual scans)
+				discoveryScanner := scanner.NewDiscoveryScanner(discoveryStore)
+				discoveryHandler = api.NewDiscoveryHandler(discoveryStore, discoveryScanner)
+				log.Info("Discovery storage initialized")
+
+				// Initialize scheduler if discovery is enabled
+				if cfg.DiscoveryEnabled {
+					log.Info("Discovery enabled, initializing scheduler",
+						"interval", cfg.DiscoveryInterval,
+						"max_concurrent", cfg.DiscoveryMaxConcurrent,
+						"default_scan_type", cfg.DiscoveryDefaultScanType)
+
+					// Create scheduler
+					discoveryScheduler = worker.NewScheduler(discoveryStore, discoveryScanner)
+
+					// Start scheduler in background
+					discoveryScheduler.Start()
+					log.Info("Discovery scheduler started")
+
+					// Defer stopping the scheduler
+					defer func() {
+						log.Info("Stopping discovery scheduler...")
+						discoveryScheduler.Stop()
+						log.Info("Discovery scheduler stopped")
+					}()
+				} else {
+					log.Info("Discovery disabled (scheduler not running). Manual scans via UI/API are still available.")
+				}
+			} else {
+				log.Warn("Storage does not support discovery, discovery features will be unavailable")
+			}
+
 			// Create MCP server
 			mcpServer := mcp.NewServer(store, cfg.MCPAuthToken)
 
@@ -46,6 +86,11 @@ func Command() *cli.Command {
 
 			// API routes
 			apiHandler.RegisterRoutes(mux)
+
+			// Discovery API routes
+			if discoveryHandler != nil {
+				discoveryHandler.RegisterRoutes(mux)
+			}
 
 			// MCP endpoint
 			mux.HandleFunc("/mcp", mcpServer.GetHTTPHandler())

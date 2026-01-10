@@ -19,7 +19,16 @@
       "Bash(# Find all files with DM_ references \\(config env variables\\) grep -rn \"\"DM_\"\" --include=\"\"*.go\"\" . --include=\"\"*.env*\"\" .)",
       "Bash(tree:*)",
       "Bash(sqlite3:*)",
-      "Bash(timeout:*)"
+      "Bash(timeout:*)",
+      "Bash(./build/rackd discovery:*)",
+      "Bash(sudo:*)",
+      "Bash(go clean:*)",
+      "Bash(./build/rackd:*)",
+      "Bash(pgrep:*)",
+      "Bash(kill:*)",
+      "Bash(pkill:*)",
+      "Bash(read:*)",
+      "Bash(grep:*)"
     ]
   }
 }

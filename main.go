@@ -6,6 +6,7 @@ import (
 
 	"github.com/martinsuchenak/rackd/cmd/datacenter"
 	"github.com/martinsuchenak/rackd/cmd/device"
+	"github.com/martinsuchenak/rackd/cmd/discovery"
 	"github.com/martinsuchenak/rackd/cmd/network"
 	"github.com/martinsuchenak/rackd/cmd/server"
 	"github.com/martinsuchenak/rackd/internal/log"
@@ -72,6 +73,12 @@ func main() {
 				Usage:       "Datacenter management commands",
 				Description: "Manage datacenters in the inventory",
 				Commands:    datacenter.Commands(),
+			},
+			{
+				Name:        "discovery",
+				Usage:       "Discovery commands",
+				Description: "Device discovery and testing commands",
+				Commands:    discovery.Commands(),
 			},
 		},
 	}

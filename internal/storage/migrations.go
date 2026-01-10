@@ -912,3 +912,217 @@ func (ss *SQLiteStorage) MigrateToV10() error {
 
 	return tx.Commit()
 }
+
+// MigrateToV11 creates device discovery tables
+func (ss *SQLiteStorage) MigrateToV11() error {
+	// Check if already migrated
+	var version int
+	err := ss.db.QueryRow("SELECT COALESCE(MAX(version), 0) FROM schema_migrations").Scan(&version)
+	if err != nil {
+		version = 0
+	}
+	if version >= 11 {
+		return nil // Already migrated
+	}
+
+	tx, err := ss.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	// Create discovered_devices table
+	_, err = tx.Exec(`
+		CREATE TABLE IF NOT EXISTS discovered_devices (
+			id TEXT PRIMARY KEY,
+			ip TEXT NOT NULL UNIQUE,
+			mac_address TEXT,
+			hostname TEXT,
+			network_id TEXT NOT NULL,
+			status TEXT NOT NULL DEFAULT 'unknown',
+			confidence INTEGER DEFAULT 50,
+			os_guess TEXT,
+			os_family TEXT,
+			open_ports TEXT,
+			services TEXT,
+			first_seen TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			last_seen TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			last_scan_id TEXT,
+			promoted_to_device_id TEXT,
+			promoted_at TIMESTAMP,
+			raw_scan_data TEXT,
+			created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			FOREIGN KEY (network_id) REFERENCES networks(id) ON DELETE CASCADE,
+			FOREIGN KEY (promoted_to_device_id) REFERENCES devices(id) ON DELETE SET NULL
+		)
+	`)
+	if err != nil {
+		return fmt.Errorf("creating discovered_devices table: %w", err)
+	}
+
+	// Create indexes for discovered_devices
+	_, err = tx.Exec(`CREATE INDEX IF NOT EXISTS idx_discovered_devices_network ON discovered_devices(network_id)`)
+	if err != nil {
+		return fmt.Errorf("creating discovered_devices network_id index: %w", err)
+	}
+	_, err = tx.Exec(`CREATE INDEX IF NOT EXISTS idx_discovered_devices_status ON discovered_devices(status)`)
+	if err != nil {
+		return fmt.Errorf("creating discovered_devices status index: %w", err)
+	}
+	_, err = tx.Exec(`CREATE INDEX IF NOT EXISTS idx_discovered_devices_promoted ON discovered_devices(promoted_to_device_id)`)
+	if err != nil {
+		return fmt.Errorf("creating discovered_devices promoted_to_device_id index: %w", err)
+	}
+	_, err = tx.Exec(`CREATE INDEX IF NOT EXISTS idx_discovered_devices_last_seen ON discovered_devices(last_seen)`)
+	if err != nil {
+		return fmt.Errorf("creating discovered_devices last_seen index: %w", err)
+	}
+
+	// Create discovery_scans table
+	_, err = tx.Exec(`
+		CREATE TABLE IF NOT EXISTS discovery_scans (
+			id TEXT PRIMARY KEY,
+			network_id TEXT NOT NULL,
+			status TEXT NOT NULL DEFAULT 'pending',
+			scan_type TEXT NOT NULL,
+			scan_depth INTEGER DEFAULT 1,
+			total_hosts INTEGER DEFAULT 0,
+			scanned_hosts INTEGER DEFAULT 0,
+			found_hosts INTEGER DEFAULT 0,
+			progress_percent REAL DEFAULT 0,
+			started_at TIMESTAMP,
+			completed_at TIMESTAMP,
+			duration_seconds INTEGER DEFAULT 0,
+			error_message TEXT,
+			created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			FOREIGN KEY (network_id) REFERENCES networks(id) ON DELETE CASCADE
+		)
+	`)
+	if err != nil {
+		return fmt.Errorf("creating discovery_scans table: %w", err)
+	}
+
+	// Create indexes for discovery_scans
+	_, err = tx.Exec(`CREATE INDEX IF NOT EXISTS idx_discovery_scans_network ON discovery_scans(network_id)`)
+	if err != nil {
+		return fmt.Errorf("creating discovery_scans network_id index: %w", err)
+	}
+	_, err = tx.Exec(`CREATE INDEX IF NOT EXISTS idx_discovery_scans_status ON discovery_scans(status)`)
+	if err != nil {
+		return fmt.Errorf("creating discovery_scans status index: %w", err)
+	}
+	_, err = tx.Exec(`CREATE INDEX IF NOT EXISTS idx_discovery_scans_created ON discovery_scans(created_at)`)
+	if err != nil {
+		return fmt.Errorf("creating discovery_scans created_at index: %w", err)
+	}
+
+	// Create discovery_rules table
+	_, err = tx.Exec(`
+		CREATE TABLE IF NOT EXISTS discovery_rules (
+			id TEXT PRIMARY KEY,
+			network_id TEXT NOT NULL UNIQUE,
+			enabled BOOLEAN DEFAULT 1,
+			scan_interval_hours INTEGER DEFAULT 24,
+			scan_type TEXT DEFAULT 'full',
+			max_concurrent_scans INTEGER DEFAULT 10,
+			timeout_seconds INTEGER DEFAULT 5,
+			scan_ports BOOLEAN DEFAULT 1,
+			port_scan_type TEXT DEFAULT 'common',
+			custom_ports TEXT,
+			service_detection BOOLEAN DEFAULT 1,
+			os_detection BOOLEAN DEFAULT 1,
+			exclude_ips TEXT,
+			exclude_hosts TEXT,
+			last_run_at TIMESTAMP,
+			next_run_at TIMESTAMP,
+			created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			FOREIGN KEY (network_id) REFERENCES networks(id) ON DELETE CASCADE
+		)
+	`)
+	if err != nil {
+		return fmt.Errorf("creating discovery_rules table: %w", err)
+	}
+
+	// Create indexes for discovery_rules
+	_, err = tx.Exec(`CREATE INDEX IF NOT EXISTS idx_discovery_rules_network ON discovery_rules(network_id)`)
+	if err != nil {
+		return fmt.Errorf("creating discovery_rules network_id index: %w", err)
+	}
+
+	// Create triggers for updating timestamps
+	_, err = tx.Exec(`
+		CREATE TRIGGER IF NOT EXISTS update_discovery_scans_timestamp
+		AFTER UPDATE ON discovery_scans
+		FOR EACH ROW
+		BEGIN
+			UPDATE discovery_scans SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
+		END
+	`)
+	if err != nil {
+		return fmt.Errorf("creating discovery_scans trigger: %w", err)
+	}
+
+	_, err = tx.Exec(`
+		CREATE TRIGGER IF NOT EXISTS update_discovery_rules_timestamp
+		AFTER UPDATE ON discovery_rules
+		FOR EACH ROW
+		BEGIN
+			UPDATE discovery_rules SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
+		END
+	`)
+	if err != nil {
+		return fmt.Errorf("creating discovery_rules trigger: %w", err)
+	}
+
+	// Update migration version
+	_, err = tx.Exec(`INSERT OR IGNORE INTO schema_migrations (version) VALUES (11)`)
+	if err != nil {
+		return fmt.Errorf("setting migration version: %w", err)
+	}
+
+	return tx.Commit()
+}
+
+// MigrateToV12 adds missing duration_seconds column to discovery_scans
+func (ss *SQLiteStorage) MigrateToV12() error {
+	// Check if already migrated
+	var version int
+	err := ss.db.QueryRow("SELECT COALESCE(MAX(version), 0) FROM schema_migrations").Scan(&version)
+	if err != nil {
+		version = 0
+	}
+	if version >= 12 {
+		return nil // Already migrated
+	}
+
+	tx, err := ss.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	// Add duration_seconds column if it doesn't exist
+	var columnExists bool
+	err = tx.QueryRow(`
+		SELECT COUNT(*) > 0 FROM pragma_table_info('discovery_scans')
+		WHERE name='duration_seconds'
+	`).Scan(&columnExists)
+
+	if err == nil && !columnExists {
+		_, err = tx.Exec(`ALTER TABLE discovery_scans ADD COLUMN duration_seconds INTEGER DEFAULT 0`)
+		if err != nil {
+			return fmt.Errorf("adding duration_seconds column: %w", err)
+		}
+	}
+
+	// Update migration version
+	_, err = tx.Exec(`INSERT OR IGNORE INTO schema_migrations (version) VALUES (12)`)
+	if err != nil {
+		return fmt.Errorf("setting migration version: %w", err)
+	}
+
+	return tx.Commit()
+}

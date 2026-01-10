@@ -24,6 +24,11 @@ func NewExtendedStorage(dataDir, storageType, format string) (ExtendedStorage, e
 	return NewSQLiteStorage(dataDir)
 }
 
+// NewDiscoveryStorage creates a storage backend with discovery support
+func NewDiscoveryStorage(dataDir, storageType, format string) (DiscoveryStorage, error) {
+	return NewSQLiteStorage(dataDir)
+}
+
 // DatacenterStorage defines the interface for datacenter storage
 type DatacenterStorage interface {
 	ListDatacenters(filter *model.DatacenterFilter) ([]model.Datacenter, error)

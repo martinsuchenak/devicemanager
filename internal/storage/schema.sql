@@ -143,3 +143,112 @@ CREATE TABLE IF NOT EXISTS schema_migrations (
 -- Insert initial schema version
 -- Note: This represents version 2, migrations will upgrade to v3, v4, and v5
 INSERT OR IGNORE INTO schema_migrations (version) VALUES (2);
+
+-- ============================================================================
+-- Migration v11: Device Discovery Tables
+-- ============================================================================
+
+-- Discovered devices table
+CREATE TABLE IF NOT EXISTS discovered_devices (
+    id TEXT PRIMARY KEY,
+    ip TEXT NOT NULL UNIQUE,
+    mac_address TEXT,
+    hostname TEXT,
+    network_id TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'unknown',
+    confidence INTEGER DEFAULT 50,
+    os_guess TEXT,
+    os_family TEXT,
+    open_ports TEXT,
+    services TEXT,
+    first_seen TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    last_seen TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    last_scan_id TEXT,
+    promoted_to_device_id TEXT,
+    promoted_at TIMESTAMP,
+    raw_scan_data TEXT,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (network_id) REFERENCES networks(id) ON DELETE CASCADE,
+    FOREIGN KEY (promoted_to_device_id) REFERENCES devices(id) ON DELETE SET NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_discovered_devices_ip ON discovered_devices(ip);
+CREATE INDEX IF NOT EXISTS idx_discovered_devices_network ON discovered_devices(network_id);
+CREATE INDEX IF NOT EXISTS idx_discovered_devices_mac ON discovered_devices(mac_address);
+CREATE INDEX IF NOT EXISTS idx_discovered_devices_status ON discovered_devices(status);
+CREATE INDEX IF NOT EXISTS idx_discovered_devices_last_seen ON discovered_devices(last_seen);
+CREATE INDEX IF NOT EXISTS idx_discovered_devices_promoted ON discovered_devices(promoted_to_device_id);
+
+-- Discovery scans table
+CREATE TABLE IF NOT EXISTS discovery_scans (
+    id TEXT PRIMARY KEY,
+    network_id TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pending',
+    scan_type TEXT NOT NULL DEFAULT 'full',
+    scan_depth INTEGER NOT NULL DEFAULT 2,
+    total_hosts INTEGER,
+    scanned_hosts INTEGER DEFAULT 0,
+    found_hosts INTEGER DEFAULT 0,
+    started_at TIMESTAMP,
+    completed_at TIMESTAMP,
+    duration_seconds INTEGER,
+    error_message TEXT,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (network_id) REFERENCES networks(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_discovery_scans_network ON discovery_scans(network_id);
+CREATE INDEX IF NOT EXISTS idx_discovery_scans_status ON discovery_scans(status);
+CREATE INDEX IF NOT EXISTS idx_discovery_scans_created ON discovery_scans(created_at);
+
+-- Discovery rules table
+CREATE TABLE IF NOT EXISTS discovery_rules (
+    id TEXT PRIMARY KEY,
+    network_id TEXT NOT NULL UNIQUE,
+    enabled BOOLEAN NOT NULL DEFAULT 1,
+    scan_interval_hours INTEGER DEFAULT 24,
+    scan_type TEXT NOT NULL DEFAULT 'full',
+    max_concurrent_scans INTEGER DEFAULT 10,
+    timeout_seconds INTEGER DEFAULT 5,
+    scan_ports BOOLEAN DEFAULT 1,
+    port_scan_type TEXT DEFAULT 'common',
+    custom_ports TEXT,
+    service_detection BOOLEAN DEFAULT 1,
+    os_detection BOOLEAN DEFAULT 1,
+    exclude_ips TEXT,
+    exclude_hosts TEXT,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (network_id) REFERENCES networks(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_discovery_rules_network ON discovery_rules(network_id);
+
+-- Trigger to update updated_at timestamp for discovered_devices
+CREATE TRIGGER IF NOT EXISTS update_discovered_devices_timestamp
+AFTER UPDATE ON discovered_devices
+FOR EACH ROW
+BEGIN
+    UPDATE discovered_devices SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
+END;
+
+-- Trigger to update updated_at timestamp for discovery_scans
+CREATE TRIGGER IF NOT EXISTS update_discovery_scans_timestamp
+AFTER UPDATE ON discovery_scans
+FOR EACH ROW
+BEGIN
+    UPDATE discovery_scans SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
+END;
+
+-- Trigger to update updated_at timestamp for discovery_rules
+CREATE TRIGGER IF NOT EXISTS update_discovery_rules_timestamp
+AFTER UPDATE ON discovery_rules
+FOR EACH ROW
+BEGIN
+    UPDATE discovery_rules SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
+END;
+
+-- Record migration
+INSERT OR IGNORE INTO schema_migrations (version) VALUES (11);
