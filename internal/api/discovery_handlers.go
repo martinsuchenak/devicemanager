@@ -8,20 +8,20 @@ import (
 	"strings"
 	"time"
 
+	"github.com/martinsuchenak/rackd/internal/discovery"
 	"github.com/martinsuchenak/rackd/internal/log"
 	"github.com/martinsuchenak/rackd/internal/model"
-	"github.com/martinsuchenak/rackd/internal/scanner"
 	"github.com/martinsuchenak/rackd/internal/storage"
 )
 
 // DiscoveryHandler handles discovery-related HTTP requests
 type DiscoveryHandler struct {
 	storage storage.DiscoveryStorage
-	scanner *scanner.DiscoveryScanner
+	scanner discovery.Scanner
 }
 
 // NewDiscoveryHandler creates a new discovery API handler
-func NewDiscoveryHandler(s storage.DiscoveryStorage, sc *scanner.DiscoveryScanner) *DiscoveryHandler {
+func NewDiscoveryHandler(s storage.DiscoveryStorage, sc discovery.Scanner) *DiscoveryHandler {
 	return &DiscoveryHandler{storage: s, scanner: sc}
 }
 

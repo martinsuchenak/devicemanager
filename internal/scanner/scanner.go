@@ -8,9 +8,13 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/martinsuchenak/rackd/pkg/discovery"
 	"github.com/martinsuchenak/rackd/internal/log"
 	"github.com/martinsuchenak/rackd/internal/model"
 )
+
+// Compile-time interface check to ensure DiscoveryScanner implements discovery.Scanner
+var _ discovery.Scanner = (*DiscoveryScanner)(nil)
 
 // DiscoveryStorage interface for storage operations
 type DiscoveryStorage interface {
@@ -24,29 +28,20 @@ type Network interface {
 	GetSubnet() string
 }
 
-// DiscoveryScanner performs network discovery
+// DiscoveryScanner performs basic network discovery (OSS version)
+// Premium features (ping, port scanning, ARP, service detection) are available in rackd-enterprise
 type DiscoveryScanner struct {
 	storage DiscoveryStorage
-
-	// Scanners
-	pingScanner    *PingScanner
-	portScanner    *PortScanner
-	arpScanner     *ARPScanner
-	serviceScanner *ServiceScanner
 }
 
-// NewDiscoveryScanner creates a new scanner
+// NewDiscoveryScanner creates a new basic scanner
 func NewDiscoveryScanner(storage DiscoveryStorage) *DiscoveryScanner {
 	return &DiscoveryScanner{
-		storage:       storage,
-		pingScanner:   NewPingScanner(),
-		portScanner:   NewPortScanner(),
-		arpScanner:    NewARPScanner(),
-		serviceScanner: NewServiceScanner(),
+		storage: storage,
 	}
 }
 
-// ScanNetwork scans a network based on discovery rules
+// ScanNetwork scans a network based on discovery rules (basic discovery only)
 func (ds *DiscoveryScanner) ScanNetwork(ctx context.Context, networkID string, rule *model.DiscoveryRule, updateFunc func(*model.DiscoveryScan)) error {
 	// Create scan record
 	scan := &model.DiscoveryScan{
@@ -95,13 +90,10 @@ func (ds *DiscoveryScanner) ScanNetwork(ctx context.Context, networkID string, r
 		updateFunc(scan)
 	}
 
-	log.Info("Starting network scan", "network_id", networkID, "hosts", len(ips))
-
-	// Log scan type for debugging
-	log.Debug("Scan configuration", "type", rule.ScanType, "scan_ports", rule.ScanPorts, "timeout", rule.TimeoutSeconds)
+	log.Info("Starting basic network discovery", "network_id", networkID, "hosts", len(ips))
 
 	// Limit concurrent scans to avoid overwhelming the system and database
-	maxConcurrent := 5 // Reduced from 20 to prevent SQLite write contention
+	maxConcurrent := 5
 	sem := make(chan struct{}, maxConcurrent)
 
 	// Scan hosts concurrently
@@ -109,8 +101,6 @@ func (ds *DiscoveryScanner) ScanNetwork(ctx context.Context, networkID string, r
 	var mu sync.Mutex
 	foundCount := 0
 	scannedCount := 0
-
-	log.Info("Spawning goroutines", "count", len(ips), "max_concurrent", maxConcurrent)
 
 	for _, ip := range ips {
 		wg.Add(1)
@@ -131,15 +121,15 @@ func (ds *DiscoveryScanner) ScanNetwork(ctx context.Context, networkID string, r
 			mu.Lock()
 			scannedCount++
 			if scannedCount%50 == 0 {
-				log.Info("Scan progress", "scanned", scannedCount, "total", len(ips))
+				log.Info("Discovery progress", "scanned", scannedCount, "total", len(ips))
 			}
 			mu.Unlock()
 
-			// Scan the host
-			device, err := ds.scanHost(ctx, ip, networkID, rule, scan.ID)
+			// Scan the host (basic discovery only)
+			device, err := ds.scanHost(ctx, ip, networkID, scan.ID)
 			if err != nil {
-				log.Debug("Host scan failed", "ip", ip, "error", err)
-				return // Continue with other hosts
+				log.Debug("Host discovery failed", "ip", ip, "error", err)
+				return
 			}
 
 			if device != nil {
@@ -148,9 +138,9 @@ func (ds *DiscoveryScanner) ScanNetwork(ctx context.Context, networkID string, r
 				scan.FoundHosts = foundCount
 				mu.Unlock()
 
-				log.Debug("Device discovered", "ip", ip, "status", device.Status, "ports", len(device.OpenPorts))
+				log.Debug("Device discovered", "ip", ip, "status", device.Status)
 
-				// Save discovered device with retry
+				// Save discovered device
 				err := ds.storage.CreateOrUpdateDiscoveredDevice(device)
 				if err != nil {
 					log.Error("Failed to save discovered device", "ip", ip, "error", err)
@@ -176,8 +166,6 @@ func (ds *DiscoveryScanner) ScanNetwork(ctx context.Context, networkID string, r
 
 	wg.Wait()
 
-	log.Info("All host scan goroutines completed", "scanned", scannedCount)
-
 	// Complete scan
 	now = time.Now()
 	scan.Status = "completed"
@@ -188,76 +176,33 @@ func (ds *DiscoveryScanner) ScanNetwork(ctx context.Context, networkID string, r
 		updateFunc(scan)
 	}
 
-	log.Info("Network scan completed", "network_id", networkID, "found", foundCount, "duration", scan.DurationSeconds)
+	log.Info("Network discovery completed", "network_id", networkID, "found", foundCount, "duration", scan.DurationSeconds)
 	return nil
 }
 
-// scanHost performs multi-stage scanning on a single host
-func (ds *DiscoveryScanner) scanHost(ctx context.Context, ip, networkID string, rule *model.DiscoveryRule, scanID string) (*model.DiscoveredDevice, error) {
-	log.Debug("Scanning host", "ip", ip)
-	timeout := time.Duration(rule.TimeoutSeconds) * time.Second
+// scanHost performs basic discovery on a single host
+// OSS version: only hostname lookup, no ping/port/ARP/service scanning
+// Premium features are available in rackd-enterprise
+func (ds *DiscoveryScanner) scanHost(ctx context.Context, ip, networkID, scanID string) (*model.DiscoveredDevice, error) {
+	log.Debug("Discovering host", "ip", ip)
 
-	// Stage 1: Ping check (if privileged)
-	var alive bool
-	var pingErr error
-	if ps := ds.pingScanner; ps != nil {
-		alive, pingErr = ds.pingScanner.Ping(ctx, ip, timeout)
-	}
-
-	// For quick scans, only report hosts that respond to ping
-	if rule.ScanType == "quick" && (!alive || pingErr != nil) {
-		return nil, nil // Host is down or unreachable
-	}
-
-	// Create device record
+	// Create device record with basic information
 	device := &model.DiscoveredDevice{
 		ID:        generateID("discovered"),
 		IP:        ip,
 		NetworkID: networkID,
-		Status:    "unknown", // Will be updated based on what we find
+		Status:    "unknown", // Basic discovery cannot determine online status without premium scanning
 		LastScanID: scanID,
 		LastSeen:  time.Now(),
 	}
 
-	// Stage 2: MAC address and hostname (if alive/ping succeeded)
-	if alive {
-		device.Status = "online"
-		if mac, err := ds.arpScanner.GetMAC(ctx, ip); err == nil {
-			device.MACAddress = mac
-		}
-
-		if hostname, err := ds.getHostname(ip); err == nil {
-			device.Hostname = hostname
-		}
+	// Attempt hostname lookup (basic DNS reverse lookup)
+	if hostname, err := ds.getHostname(ip); err == nil {
+		device.Hostname = hostname
 	}
 
-	// Stage 3: Port scanning (always do for full/deep scans, even if ping failed)
-	if rule.ScanPorts && rule.ScanType != "quick" {
-		ports, err := ds.portScanner.ScanPorts(ctx, ip, rule)
-		if err == nil && len(ports) > 0 {
-			device.OpenPorts = ports
-			// Update status if we found open ports
-			if device.Status == "unknown" {
-				device.Status = "online"
-			}
-		}
-	}
-
-	// Stage 4: Service fingerprinting
-	if rule.ServiceDetection && len(device.OpenPorts) > 0 {
-		services := ds.serviceScanner.DetectServices(ctx, ip, device.OpenPorts)
-		device.Services = services
-	}
-
-	// Stage 5: OS fingerprinting (if enabled)
-	if rule.OSDetection {
-		osGuess := ds.guessOS(device)
-		device.OSGuess = osGuess.OS
-		device.OSFamily = osGuess.Family
-	}
-
-	// Calculate confidence score
-	device.Confidence = ds.calculateConfidence(device)
+	// Basic confidence score for manually/API-discovered devices
+	device.Confidence = 50 // Base confidence for basic discovery
 
 	return device, nil
 }
@@ -317,84 +262,17 @@ func (ds *DiscoveryScanner) getHostname(ip string) (string, error) {
 	return names[0], nil
 }
 
-// OSGuess represents an OS guess
-type OSGuess struct {
-	OS     string
-	Family string
-}
-
-// guessOS guesses the OS based on available data
-func (ds *DiscoveryScanner) guessOS(device *model.DiscoveredDevice) *OSGuess {
-	// Basic passive fingerprinting based on open ports
-	osGuess := &OSGuess{
-		OS:     "Unknown",
-		Family: "Unknown",
-	}
-
-	// Check for common port patterns
-	hasWindowsPorts := containsAny(device.OpenPorts, []int{135, 139, 445, 3389})
-	hasLinuxPorts := containsAny(device.OpenPorts, []int{22, 111, 2049})
-	hasUnixPorts := containsAny(device.OpenPorts, []int{22, 111})
-
-	if hasWindowsPorts && !hasLinuxPorts {
-		osGuess.OS = "Windows"
-		osGuess.Family = "Windows"
-	} else if hasLinuxPorts && !hasWindowsPorts {
-		osGuess.OS = "Linux"
-		osGuess.Family = "Unix"
-	} else if hasUnixPorts {
-		osGuess.OS = "Unix-like"
-		osGuess.Family = "Unix"
-	}
-
-	// Check for specific services
-	for _, svc := range device.Services {
-		if svc.Service == "SSH" {
-			if osGuess.Family == "Unknown" {
-				osGuess.OS = "Linux/Unix"
-				osGuess.Family = "Unix"
-			}
-		}
-	}
-
-	return osGuess
-}
-
-// calculateConfidence calculates a confidence score
-func (ds *DiscoveryScanner) calculateConfidence(device *model.DiscoveredDevice) int {
-	score := 50
-
-	if device.MACAddress != "" {
-		score += 20
-	}
-	if device.Hostname != "" {
-		score += 15
-	}
-	if len(device.OpenPorts) > 0 {
-		score += 10
-	}
-	if device.OSGuess != "" {
-		score += 5
-	}
-
-	if score > 100 {
-		score = 100
-	}
-
-	return score
-}
-
 // getDepthFromType converts scan type to depth level
 func (ds *DiscoveryScanner) getDepthFromType(scanType string) int {
 	switch scanType {
 	case "quick":
 		return 1
 	case "full":
-		return 3
+		return 2 // Reduced for OSS (no deep scanning)
 	case "deep":
-		return 5
+		return 2 // Reduced for OSS (no deep scanning)
 	default:
-		return 2
+		return 1
 	}
 }
 
@@ -406,18 +284,6 @@ func inc(ip net.IP) {
 			break
 		}
 	}
-}
-
-// containsAny checks if a slice contains any of the specified values
-func containsAny(slice []int, values []int) bool {
-	for _, v := range values {
-		for _, s := range slice {
-			if s == v {
-				return true
-			}
-		}
-	}
-	return false
 }
 
 // generateID generates a unique ID

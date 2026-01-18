@@ -84,3 +84,11 @@ type ExtendedStorage interface {
 	RelationshipStorage
 	NetworkPoolStorage
 }
+
+// PremiumStorage combines all storage interfaces
+type PremiumStorage interface {
+	Storage
+	RelationshipStorage
+	NetworkPoolStorage
+	DiscoveryStorage
+}

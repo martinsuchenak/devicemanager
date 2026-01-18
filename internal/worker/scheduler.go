@@ -5,9 +5,13 @@ import (
 	"sync"
 	"time"
 
+	"github.com/martinsuchenak/rackd/pkg/discovery"
 	"github.com/martinsuchenak/rackd/internal/log"
 	"github.com/martinsuchenak/rackd/internal/model"
 )
+
+// Compile-time interface check to ensure Scheduler implements discovery.Scheduler
+var _ discovery.Scheduler = (*Scheduler)(nil)
 
 // DiscoveryStorage interface for storage operations
 type DiscoveryStorage interface {
@@ -15,12 +19,8 @@ type DiscoveryStorage interface {
 	GetDiscoveryRule(id string) (*model.DiscoveryRule, error)
 }
 
-// Scanner interface for scanning operations
-type Scanner interface {
-	ScanNetwork(ctx context.Context, networkID string, rule *model.DiscoveryRule, updateFunc func(*model.DiscoveryScan)) error
-}
-
 // Scheduler manages background tasks
+// Implements discovery.Scheduler interface
 type Scheduler struct {
 	mu      sync.RWMutex
 	tasks   map[string]*Task
@@ -31,7 +31,7 @@ type Scheduler struct {
 
 	// Dependencies
 	storage DiscoveryStorage
-	scanner Scanner
+	scanner discovery.Scanner
 }
 
 // Task represents a scheduled or running task
@@ -50,7 +50,7 @@ type Task struct {
 type TaskHandler func(ctx context.Context, taskID string) error
 
 // NewScheduler creates a new scheduler
-func NewScheduler(storage DiscoveryStorage, scanner Scanner) *Scheduler {
+func NewScheduler(storage DiscoveryStorage, scanner discovery.Scanner) *Scheduler {
 	ctx, cancel := context.WithCancel(context.Background())
 	return &Scheduler{
 		tasks:   make(map[string]*Task),
@@ -115,7 +115,44 @@ func (s *Scheduler) run() {
 }
 
 // RegisterTask registers a new task
-func (s *Scheduler) RegisterTask(task *Task) error {
+// Implements discovery.Scheduler interface
+func (s *Scheduler) RegisterTask(task *discovery.Task) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	// Convert discovery.Task to internal worker.Task
+	interval := time.Duration(task.Interval) * time.Second
+	var nextRun time.Time
+	if task.NextRun > 0 {
+		nextRun = time.Unix(task.NextRun, 0)
+	} else {
+		nextRun = time.Now().Add(interval)
+	}
+
+	var lastRun *time.Time
+	if task.LastRun != nil {
+		t := time.Unix(*task.LastRun, 0)
+		lastRun = &t
+	}
+
+	internalTask := &Task{
+		ID:       task.ID,
+		Name:     task.Name,
+		Type:     task.Type,
+		Interval: interval,
+		NextRun:  nextRun,
+		LastRun:  lastRun,
+		Status:   task.Status,
+		Handler:  TaskHandler(task.Handler),
+	}
+
+	s.tasks[task.ID] = internalTask
+	log.Info("Task registered", "task_id", task.ID, "type", task.Type, "interval", interval)
+	return nil
+}
+
+// registerTaskInternal registers an internal task (for backward compatibility)
+func (s *Scheduler) registerTaskInternal(task *Task) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
