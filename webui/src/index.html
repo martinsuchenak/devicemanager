@@ -9,7 +9,10 @@
     <link rel="stylesheet" href="/assets/output.css">
 </head>
 
-<body class="bg-gray-50 text-gray-900 dark:bg-gray-900 dark:text-gray-100" x-data="{ currentView: 'devices' }">
+<body class="bg-gray-50 text-gray-900 dark:bg-gray-900 dark:text-gray-100" x-data="{
+    get currentView() { return this.$store.router.currentView; },
+    set currentView(value) { this.$store.router.navigate(value); }
+    }">
     <!-- Skip to Main Content Link -->
     <a href="#main-content"
         class="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 z-50 px-4 py-2 bg-blue-600 text-white rounded-lg shadow-lg">
@@ -212,10 +215,8 @@
             <div x-show="showModal" class="fixed inset-0 z-50 overflow-y-auto" role="dialog" aria-modal="true"
                 x-trap.noscroll="showModal">
                 <div class="flex min-h-screen items-center justify-center p-4">
-                    <div x-show="showModal"
-                        class="fixed inset-0 bg-gray-900/20 backdrop-blur-sm transition-opacity dark:bg-gray-900/50"
-                        @click="closeModal()"></div>
-                    <div class="relative z-10 w-full max-w-3xl bg-white rounded-lg shadow-xl dark:bg-gray-800">
+                    <div x-show="showModal" :class="editModal.backdropClass" @click="closeModal()"></div>
+                    <div :class="editModal.modalClass">
                         <!-- Header -->
                         <div
                             class="flex items-center justify-between border-b border-gray-200 px-6 py-4 dark:border-gray-700">
@@ -411,8 +412,7 @@
                             </form>
                         </div>
                         <!-- Footer -->
-                        <div
-                            class="border-t border-gray-200 px-6 py-4 bg-gray-50 dark:border-gray-700 dark:bg-gray-900 flex gap-3">
+                        <div :class="editModal.footerClass">
                             <button @click="saveDevice" :disabled="saving"
                                 class="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50">Save</button>
                             <button @click="closeModal()"
@@ -426,10 +426,8 @@
             <div x-show="showViewModal" class="fixed inset-0 z-50 overflow-y-auto" role="dialog" aria-modal="true"
                 x-trap.noscroll="showViewModal">
                 <div class="flex min-h-screen items-center justify-center p-4">
-                    <div x-show="showViewModal"
-                        class="fixed inset-0 bg-gray-900/20 backdrop-blur-sm transition-opacity dark:bg-gray-900/50"
-                        @click="closeViewModal()"></div>
-                    <div class="relative z-10 w-full max-w-lg bg-white rounded-lg shadow-xl dark:bg-gray-800">
+                    <div x-show="showViewModal" :class="viewModal.backdropClass" @click="closeViewModal()"></div>
+                    <div :class="viewModal.modalClass">
                         <div
                             class="flex items-center justify-between border-b border-gray-200 px-6 py-4 dark:border-gray-700">
                             <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Device Details</h3>
@@ -446,44 +444,44 @@
                             <!-- Details content (simplified for brevity but functionally same as before) -->
                             <div>
                                 <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Name</p>
-                                <p class="mt-1 text-gray-900 dark:text-gray-100" x-text="currentDevice.name"></p>
+                                <p class="mt-1 text-gray-900 dark:text-gray-100" x-text="viewModal.currentItem?.name"></p>
                             </div>
-                            <div x-show="currentDevice.description">
+                            <div x-show="viewModal.currentItem?.description">
                                 <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Description</p>
                                 <p class="mt-1 text-gray-900 dark:text-gray-100 whitespace-pre-wrap"
-                                    x-text="currentDevice.description"></p>
+                                    x-text="viewModal.currentItem?.description"></p>
                             </div>
                             <div class="grid grid-cols-2 gap-4">
                                 <div>
                                     <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Make/Model</p>
                                     <p class="mt-1 text-gray-900 dark:text-gray-100"
-                                        x-text="currentDevice.make_model || '—'"></p>
+                                        x-text="viewModal.currentItem?.make_model || '—'"></p>
                                 </div>
                                 <div>
                                     <p class="text-sm font-medium text-gray-500 dark:text-gray-400">OS</p>
-                                    <p class="mt-1 text-gray-900 dark:text-gray-100" x-text="currentDevice.os || '—'">
+                                    <p class="mt-1 text-gray-900 dark:text-gray-100" x-text="viewModal.currentItem?.os || '—'">
                                     </p>
                                 </div>
                             </div>
                             <div>
                                 <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Datacenter</p>
                                 <p class="mt-1 text-gray-900 dark:text-gray-100"
-                                    x-text="currentDevice.datacenter_name || 'None'"></p>
+                                    x-text="viewModal.currentItem?.datacenter_name || 'None'"></p>
                             </div>
                             <div>
                                 <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Username</p>
-                                <p class="mt-1 text-gray-900 dark:text-gray-100" x-text="currentDevice.username || '—'">
+                                <p class="mt-1 text-gray-900 dark:text-gray-100" x-text="viewModal.currentItem?.username || '—'">
                                 </p>
                             </div>
                             <div>
                                 <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Location</p>
-                                <p class="mt-1 text-gray-900 dark:text-gray-100" x-text="currentDevice.location || '—'">
+                                <p class="mt-1 text-gray-900 dark:text-gray-100" x-text="viewModal.currentItem?.location || '—'">
                                 </p>
                             </div>
                             <div>
                                 <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Addresses</p>
                                 <div class="mt-1 space-y-1">
-                                    <template x-for="addr in currentDevice.addresses" :key="addr.ip">
+                                    <template x-for="addr in viewModal.currentItem?.addresses" :key="addr.ip">
                                         <div class="font-mono text-sm text-gray-900 dark:text-gray-100">
                                             <span x-text="addr.ip"></span>
                                             <span x-show="addr.port" x-text="':' + addr.port"></span>
@@ -491,7 +489,7 @@
                                                 x-text="' (' + addr.label + ')'"></span>
                                         </div>
                                     </template>
-                                    <p x-show="!currentDevice.addresses || currentDevice.addresses.length === 0"
+                                    <p x-show="!viewModal.currentItem?.addresses || viewModal.currentItem?.addresses.length === 0"
                                         class="text-gray-500 dark:text-gray-400">—</p>
                                 </div>
                             </div>
@@ -499,37 +497,37 @@
                                 <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Domains</p>
                                 <div class="mt-1 space-y-1">
                                     <div
-                                        x-show="Array.isArray(currentDevice.domains) && currentDevice.domains.length > 0">
-                                        <template x-for="domain in currentDevice.domains" :key="domain">
+                                        x-show="Array.isArray(viewModal.currentItem?.domains) && viewModal.currentItem?.domains.length > 0">
+                                        <template x-for="domain in viewModal.currentItem?.domains" :key="domain">
                                             <div class="text-sm text-gray-900 dark:text-gray-100" x-text="domain"></div>
                                         </template>
                                     </div>
-                                    <p x-show="!Array.isArray(currentDevice.domains) || currentDevice.domains.length === 0"
+                                    <p x-show="!Array.isArray(viewModal.currentItem?.domains) || viewModal.currentItem?.domains.length === 0"
                                         class="text-gray-500 dark:text-gray-400">—</p>
                                 </div>
                             </div>
                             <div>
                                 <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Tags</p>
                                 <div class="mt-1 flex flex-wrap gap-1">
-                                    <div x-show="Array.isArray(currentDevice.tags) && currentDevice.tags.length > 0">
-                                        <template x-for="tag in currentDevice.tags" :key="tag">
+                                    <div x-show="Array.isArray(viewModal.currentItem?.tags) && viewModal.currentItem?.tags.length > 0">
+                                        <template x-for="tag in viewModal.currentItem?.tags" :key="tag">
                                             <span
                                                 class="inline-flex items-center px-2 py-0.5 bg-blue-100 text-blue-800 text-xs font-medium rounded-full dark:bg-blue-900 dark:text-blue-200"
                                                 x-text="tag"></span>
                                         </template>
                                     </div>
-                                    <p x-show="!Array.isArray(currentDevice.tags) || currentDevice.tags.length === 0"
+                                    <p x-show="!Array.isArray(viewModal.currentItem?.tags) || viewModal.currentItem?.tags.length === 0"
                                         class="text-gray-500 dark:text-gray-400">—</p>
                                 </div>
                             </div>
                             <div>
                                 <p class="text-sm font-medium text-gray-500 dark:text-gray-400">ID</p>
                                 <p class="mt-1 text-sm text-gray-500 font-mono break-all dark:text-gray-400"
-                                    x-text="currentDevice.id"></p>
+                                    x-text="viewModal.currentItem?.id"></p>
                             </div>
                         </div>
                         <div
-                            class="border-t border-gray-200 px-6 py-4 bg-gray-50 dark:border-gray-700 dark:bg-gray-900 flex gap-3">
+                            :class="viewModal.footerClass">
                             <button @click="editCurrentDevice()"
                                 class="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Edit</button>
                             <button @click="deleteCurrentDevice()"
@@ -629,10 +627,8 @@
             <div x-show="showModal" class="fixed inset-0 z-50 overflow-y-auto" role="dialog" aria-modal="true"
                 x-trap.noscroll="showModal">
                 <div class="flex min-h-screen items-center justify-center p-4">
-                    <div x-show="showModal"
-                        class="fixed inset-0 bg-gray-900/20 backdrop-blur-sm transition-opacity dark:bg-gray-900/50"
-                        @click="closeModal()"></div>
-                    <div class="relative z-10 w-full max-w-lg bg-white rounded-lg shadow-xl dark:bg-gray-800">
+                    <div x-show="showModal" :class="editModal.backdropClass" @click="closeModal()"></div>
+                    <div :class="editModal.modalClass">
                         <div
                             class="flex items-center justify-between border-b border-gray-200 px-6 py-4 dark:border-gray-700">
                             <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100" x-text="modalTitle"></h3>
@@ -676,7 +672,7 @@
                             </form>
                         </div>
                         <div
-                            class="border-t border-gray-200 px-6 py-4 bg-gray-50 dark:border-gray-700 dark:bg-gray-900 flex gap-3">
+                            :class="viewModal.footerClass">
                             <button @click="saveNetwork" :disabled="saving"
                                 class="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50">Save</button>
                             <button @click="closeModal()"
@@ -689,10 +685,8 @@
             <div x-show="showViewModal" class="fixed inset-0 z-50 overflow-y-auto" role="dialog" aria-modal="true"
                 x-trap.noscroll="showViewModal">
                 <div class="flex min-h-screen items-center justify-center p-4">
-                    <div x-show="showViewModal"
-                        class="fixed inset-0 bg-gray-900/20 backdrop-blur-sm transition-opacity dark:bg-gray-900/50"
-                        @click="closeViewModal()"></div>
-                    <div class="relative z-10 w-full max-w-lg bg-white rounded-lg shadow-xl dark:bg-gray-800">
+                    <div x-show="showViewModal" :class="viewModal.backdropClass" @click="closeViewModal()"></div>
+                    <div :class="viewModal.modalClass">
                         <div
                             class="flex items-center justify-between border-b border-gray-200 px-6 py-4 dark:border-gray-700">
                             <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Network Details</h3>
@@ -732,7 +726,7 @@
                             </div>
                         </div>
                         <div
-                            class="border-t border-gray-200 px-6 py-4 bg-gray-50 dark:border-gray-700 dark:bg-gray-900 flex gap-3">
+                            :class="viewModal.footerClass">
                             <button @click="editCurrentNetwork()"
                                 class="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Edit</button>
                             <button @click="deleteCurrentNetwork()"
@@ -821,10 +815,8 @@
             <div x-show="showViewModal" class="fixed inset-0 z-50 overflow-y-auto" role="dialog" aria-modal="true"
                 x-trap.noscroll="showViewModal">
                 <div class="flex min-h-screen items-center justify-center p-4">
-                    <div x-show="showViewModal"
-                        class="fixed inset-0 bg-gray-900/20 backdrop-blur-sm transition-opacity dark:bg-gray-900/50"
-                        @click="closeViewModal()"></div>
-                    <div class="relative z-10 w-full max-w-lg bg-white rounded-lg shadow-xl dark:bg-gray-800">
+                    <div x-show="showViewModal" :class="viewModal.backdropClass" @click="closeViewModal()"></div>
+                    <div :class="viewModal.modalClass">
                         <div
                             class="flex items-center justify-between border-b border-gray-200 px-6 py-4 dark:border-gray-700">
                             <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Datacenter Details</h3>
@@ -858,7 +850,7 @@
                             </div>
                         </div>
                         <div
-                            class="border-t border-gray-200 px-6 py-4 bg-gray-50 dark:border-gray-700 dark:bg-gray-900 flex gap-3">
+                            :class="viewModal.footerClass">
                             <button @click="editCurrentDatacenter()"
                                 class="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Edit</button>
                             <button @click="deleteCurrentDatacenter()"
@@ -874,10 +866,8 @@
             <div x-show="showModal" class="fixed inset-0 z-50 overflow-y-auto" role="dialog" aria-modal="true"
                 x-trap.noscroll="showModal">
                 <div class="flex min-h-screen items-center justify-center p-4">
-                    <div x-show="showModal"
-                        class="fixed inset-0 bg-gray-900/20 backdrop-blur-sm transition-opacity dark:bg-gray-900/50"
-                        @click="closeModal()"></div>
-                    <div class="relative z-10 w-full max-w-lg bg-white rounded-lg shadow-xl dark:bg-gray-800">
+                    <div x-show="showModal" :class="editModal.backdropClass" @click="closeModal()"></div>
+                    <div :class="editModal.modalClass">
                         <div
                             class="flex items-center justify-between border-b border-gray-200 px-6 py-4 dark:border-gray-700">
                             <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100" x-text="modalTitle"></h3>
@@ -913,7 +903,7 @@
                             </form>
                         </div>
                         <div
-                            class="border-t border-gray-200 px-6 py-4 bg-gray-50 dark:border-gray-700 dark:bg-gray-900 flex gap-3">
+                            :class="viewModal.footerClass">
                             <button @click="saveDatacenter" :disabled="saving"
                                 class="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50">Save</button>
                             <button @click="closeModal()"
@@ -1074,8 +1064,15 @@
                             Clear Filters
                         </button>
                         <div class="flex-1"></div>
+                        <button @click="deleteAll()" x-show="discoveredDevices.length > 0"
+                            class="inline-flex items-center px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 dark:bg-red-500 dark:hover:bg-red-600 mr-3">
+                            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 011-1h2a1 1 0 011 1v3M4 7h16" />
+                            </svg>
+                            Delete All
+                        </button>
                         <button @click="openScanModal()"
-                            class="inline-flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">
+                            class="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600">
                             <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                             </svg>
@@ -1090,11 +1087,11 @@
                         <span class="text-sm text-blue-800 dark:text-blue-200" x-text="`${selectedDevices.size} device(s) selected`"></span>
                         <div class="flex gap-2">
                             <button @click="openBulkPromoteModal()"
-                                class="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm">
+                                class="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm dark:bg-blue-500 dark:hover:bg-blue-600">
                                 Promote Selected
                             </button>
                             <button @click="bulkDelete()"
-                                class="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700 text-sm">
+                                class="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700 text-sm dark:bg-red-500 dark:hover:bg-red-600">
                                 Delete Selected
                             </button>
                         </div>
@@ -1151,7 +1148,7 @@
                                         <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400" x-text="new Date(device.last_seen).toLocaleString()"></td>
                                         <td class="px-4 py-3 whitespace-nowrap text-right text-sm font-medium">
                                             <button @click="viewDevice(device.id)" class="text-blue-600 hover:text-blue-900 dark:text-blue-400 mr-2">View</button>
-                                            <button @click="openPromoteModal(device.id)" x-show="!device.promoted_to_device_id" class="text-green-600 hover:text-green-900 dark:text-green-400">Promote</button>
+                                            <button @click="openPromoteModal(device.id)" x-show="!device.promoted_to_device_id" class="text-blue-600 hover:text-blue-900 dark:text-blue-400">Promote</button>
                                         </td>
                                     </tr>
                                 </template>
@@ -1167,10 +1164,11 @@
             </div>
 
             <!-- View Device Modal -->
-            <div x-show="showViewModal" class="fixed inset-0 z-50 overflow-y-auto" role="dialog" style="display: none;">
+            <div x-show="showViewModal" class="fixed inset-0 z-50 overflow-y-auto" role="dialog" aria-modal="true"
+                x-trap.noscroll="showViewModal">
                 <div class="flex min-h-screen items-center justify-center p-4">
-                    <div x-show="showViewModal" class="fixed inset-0 bg-gray-900/50" @click="closeViewModal()"></div>
-                    <div class="relative bg-white rounded-lg shadow-xl max-w-2xl w-full dark:bg-gray-800">
+                    <div x-show="showViewModal" class="fixed inset-0 bg-gray-900/20 backdrop-blur-sm transition-opacity dark:bg-gray-900/50" @click="closeViewModal()"></div>
+                    <div class="relative z-10 bg-white rounded-lg shadow-xl max-w-2xl w-full dark:bg-gray-800">
                         <div class="flex items-center justify-between p-6 border-b dark:border-gray-700">
                             <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">Discovered Device Details</h3>
                             <button @click="closeViewModal()" class="text-gray-400 hover:text-gray-500">
@@ -1179,71 +1177,75 @@
                                 </svg>
                             </button>
                         </div>
-                        <div class="p-6 space-y-4">
+                        <div class="p-6 space-y-4" x-show="viewModal.currentItem">
                             <div class="grid grid-cols-2 gap-4">
                                 <div>
                                     <label class="text-sm font-medium text-gray-500 dark:text-gray-400">IP Address</label>
-                                    <p class="text-gray-900 dark:text-gray-100" x-text="currentDevice.ip"></p>
+                                    <p class="text-gray-900 dark:text-gray-100" x-text="viewModal.currentItem?.ip"></p>
                                 </div>
                                 <div>
                                     <label class="text-sm font-medium text-gray-500 dark:text-gray-400">MAC Address</label>
-                                    <p class="text-gray-900 dark:text-gray-100" x-text="currentDevice.mac_address || '-'"></p>
+                                    <p class="text-gray-900 dark:text-gray-100" x-text="viewModal.currentItem?.mac_address || '-'"></p>
                                 </div>
                                 <div>
                                     <label class="text-sm font-medium text-gray-500 dark:text-gray-400">Hostname</label>
-                                    <p class="text-gray-900 dark:text-gray-100" x-text="currentDevice.hostname || '-'"></p>
+                                    <p class="text-gray-900 dark:text-gray-100" x-text="viewModal.currentItem?.hostname || '-'"></p>
                                 </div>
                                 <div>
                                     <label class="text-sm font-medium text-gray-500 dark:text-gray-400">Network</label>
-                                    <p class="text-gray-900 dark:text-gray-100" x-text="currentDevice.network_name || '-'"></p>
+                                    <p class="text-gray-900 dark:text-gray-100" x-text="viewModal.currentItem?.network_name || '-'"></p>
                                 </div>
                                 <div>
                                     <label class="text-sm font-medium text-gray-500 dark:text-gray-400">Status</label>
-                                    <span :class="getStatusBadgeClass(currentDevice.status)" class="px-2 py-1 text-xs font-medium rounded-full" x-text="currentDevice.status"></span>
+                                    <span :class="getStatusBadgeClass(viewModal.currentItem?.status)" class="px-2 py-1 text-xs font-medium rounded-full" x-text="viewModal.currentItem?.status"></span>
                                 </div>
                                 <div>
                                     <label class="text-sm font-medium text-gray-500 dark:text-gray-400">Confidence</label>
-                                    <p class="text-gray-900 dark:text-gray-100" x-text="currentDevice.confidence + '%'"></p>
+                                    <p class="text-gray-900 dark:text-gray-100" x-text="viewModal.currentItem?.confidence + '%'"></p>
                                 </div>
                                 <div class="col-span-2">
                                     <label class="text-sm font-medium text-gray-500 dark:text-gray-400">OS Guess</label>
-                                    <p class="text-gray-900 dark:text-gray-100" x-text="currentDevice.os_guess || (currentDevice.os_family ? currentDevice.os_family + ' (family)' : '-')"></p>
+                                    <p class="text-gray-900 dark:text-gray-100" x-text="viewModal.currentItem?.os_guess || (viewModal.currentItem?.os_family ? viewModal.currentItem?.os_family + ' (family)' : '-')"></p>
                                 </div>
                                 <div class="col-span-2">
                                     <label class="text-sm font-medium text-gray-500 dark:text-gray-400">Open Ports</label>
-                                    <p class="text-gray-900 dark:text-gray-100" x-text="currentDevice.open_ports ? currentDevice.open_ports.join(', ') : '-'"></p>
+                                    <p class="text-gray-900 dark:text-gray-100" x-text="viewModal.currentItem?.open_ports ? viewModal.currentItem?.open_ports.join(', ') : '-'"></p>
                                 </div>
-                                <div class="col-span-2" x-show="currentDevice.services && currentDevice.services.length > 0">
+                                <div class="col-span-2" x-show="viewModal.currentItem?.services && viewModal.currentItem?.services.length > 0">
                                     <label class="text-sm font-medium text-gray-500 dark:text-gray-400">Services</label>
                                     <div class="mt-1 space-y-1">
-                                        <template x-for="service in currentDevice.services" :key="service.port">
+                                        <template x-for="service in viewModal.currentItem?.services" :key="service.port">
                                             <p class="text-gray-900 dark:text-gray-100" x-text="`Port ${service.port}: ${service.service}${service.version ? ' (' + service.version + ')' : ''}`"></p>
                                         </template>
                                     </div>
                                 </div>
                                 <div>
                                     <label class="text-sm font-medium text-gray-500 dark:text-gray-400">First Seen</label>
-                                    <p class="text-gray-900 dark:text-gray-100" x-text="new Date(currentDevice.first_seen).toLocaleString()"></p>
+                                    <p class="text-gray-900 dark:text-gray-100" x-text="new Date(viewModal.currentItem?.first_seen).toLocaleString()"></p>
                                 </div>
                                 <div>
                                     <label class="text-sm font-medium text-gray-500 dark:text-gray-400">Last Seen</label>
-                                    <p class="text-gray-900 dark:text-gray-100" x-text="new Date(currentDevice.last_seen).toLocaleString()"></p>
+                                    <p class="text-gray-900 dark:text-gray-100" x-text="new Date(viewModal.currentItem?.last_seen).toLocaleString()"></p>
                                 </div>
                             </div>
                         </div>
-                        <div class="flex justify-end gap-3 p-6 border-t dark:border-gray-700">
+                        <div :class="viewModal.footerClass" x-show="viewModal.currentItem">
+                            <button @click="closeViewModal(); openPromoteModal(viewModal.currentItem?.id);" x-show="!viewModal.currentItem?.promoted_to_device_id" class="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 dark:bg-green-500 dark:hover:bg-green-600">Promote to Device</button>
+                            <button @click="deleteCurrentDevice()" class="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">Delete</button>
+                        </div>
+                        <div class="p-6 border-t dark:border-gray-700 flex justify-end">
                             <button @click="closeViewModal()" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-200">Close</button>
-                            <button @click="closeViewModal(); openPromoteModal(currentDevice.id);" x-show="!currentDevice.promoted_to_device_id" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">Promote to Device</button>
                         </div>
                     </div>
                 </div>
             </div>
 
             <!-- Promote Device Modal -->
-            <div x-show="showPromoteModal" class="fixed inset-0 z-50 overflow-y-auto" role="dialog" style="display: none;">
+            <div x-show="showPromoteModal" class="fixed inset-0 z-50 overflow-y-auto" role="dialog" aria-modal="true"
+                x-trap.noscroll="showPromoteModal">
                 <div class="flex min-h-screen items-center justify-center p-4">
-                    <div x-show="showPromoteModal" class="fixed inset-0 bg-gray-900/50" @click="closePromoteModal()"></div>
-                    <div class="relative bg-white rounded-lg shadow-xl max-w-2xl w-full dark:bg-gray-800">
+                    <div x-show="showPromoteModal" :class="promoteModal.backdropClass" @click="closePromoteModal()"></div>
+                    <div :class="promoteModal.modalClass">
                         <div class="flex items-center justify-between p-6 border-b dark:border-gray-700">
                             <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">Promote Device</h3>
                             <button @click="closePromoteModal()" class="text-gray-400 hover:text-gray-500">
@@ -1253,7 +1255,7 @@
                             </button>
                         </div>
                         <div class="p-6">
-                            <p class="text-sm text-gray-500 mb-4">Promote discovered device <span class="font-mono" x-text="currentDevice.ip"></span> to a documented device.</p>
+                            <p class="text-sm text-gray-500 mb-4">Promote discovered device <span class="font-mono" x-text="viewModal.currentItem?.ip"></span> to a documented device.</p>
                             <form @submit.prevent="promoteDevice()" class="space-y-4">
                                 <div>
                                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Name *</label>
@@ -1301,7 +1303,7 @@
                                 </div>
                                 <div class="flex gap-3 pt-2">
                                     <button type="submit" :disabled="saving"
-                                        class="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50">Promote Device</button>
+                                        class="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 dark:bg-blue-500 dark:hover:bg-blue-600">Promote Device</button>
                                     <button type="button" @click="closePromoteModal()"
                                         class="flex-1 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-200">Cancel</button>
                                 </div>
@@ -1312,10 +1314,11 @@
             </div>
 
             <!-- Bulk Promote Modal -->
-            <div x-show="showBulkPromoteModal" class="fixed inset-0 z-50 overflow-y-auto" role="dialog" style="display: none;">
+            <div x-show="showBulkPromoteModal" class="fixed inset-0 z-50 overflow-y-auto" role="dialog" aria-modal="true"
+                x-trap.noscroll="showBulkPromoteModal">
                 <div class="flex min-h-screen items-center justify-center p-4">
-                    <div x-show="showBulkPromoteModal" class="fixed inset-0 bg-gray-900/50" @click="closeBulkPromoteModal()"></div>
-                    <div class="relative bg-white rounded-lg shadow-xl max-w-2xl w-full dark:bg-gray-800">
+                    <div x-show="showBulkPromoteModal" :class="bulkPromoteModal.backdropClass" @click="closeBulkPromoteModal()"></div>
+                    <div :class="bulkPromoteModal.modalClass">
                         <div class="flex items-center justify-between p-6 border-b dark:border-gray-700">
                             <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">Bulk Promote Devices</h3>
                             <button @click="closeBulkPromoteModal()" class="text-gray-400 hover:text-gray-500">
@@ -1356,7 +1359,7 @@
                                 </div>
                                 <div class="flex gap-3 pt-2">
                                     <button type="submit" :disabled="saving"
-                                        class="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50">Promote All</button>
+                                        class="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 dark:bg-blue-500 dark:hover:bg-blue-600">Promote All</button>
                                     <button type="button" @click="closeBulkPromoteModal()"
                                         class="flex-1 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-200">Cancel</button>
                                 </div>
@@ -1367,10 +1370,11 @@
             </div>
 
             <!-- Start Scan Modal -->
-            <div x-show="showScanModal" class="fixed inset-0 z-50 overflow-y-auto" role="dialog" style="display: none;">
+            <div x-show="showScanModal" class="fixed inset-0 z-50 overflow-y-auto" role="dialog" aria-modal="true"
+                x-trap.noscroll="showScanModal">
                 <div class="flex min-h-screen items-center justify-center p-4">
-                    <div x-show="showScanModal" class="fixed inset-0 bg-gray-900/50" @click="closeScanModal()"></div>
-                    <div class="relative bg-white rounded-lg shadow-xl max-w-md w-full dark:bg-gray-800">
+                    <div x-show="showScanModal" :class="scanModal.backdropClass" @click="closeScanModal()"></div>
+                    <div :class="scanModal.modalClass">
                         <div class="flex items-center justify-between p-6 border-b dark:border-gray-700">
                             <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">Start Discovery Scan</h3>
                             <button @click="closeScanModal()" class="text-gray-400 hover:text-gray-500">
@@ -1391,18 +1395,9 @@
                                         </template>
                                     </select>
                                 </div>
-                                <div>
-                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Scan Type</label>
-                                    <select x-model="scanForm.scan_type"
-                                        class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100">
-                                        <option value="quick">Quick (ping only)</option>
-                                        <option value="full">Full (ping + ports + services)</option>
-                                        <option value="deep">Deep (full + OS detection)</option>
-                                    </select>
-                                </div>
                                 <div class="flex gap-3 pt-2">
                                     <button type="submit" :disabled="scanning"
-                                        class="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50">Start Scan</button>
+                                        class="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 dark:bg-blue-500 dark:hover:bg-blue-600">Start Scan</button>
                                     <button type="button" @click="closeScanModal()"
                                         class="flex-1 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-200">Cancel</button>
                                 </div>

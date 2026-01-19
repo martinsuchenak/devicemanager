@@ -13,6 +13,12 @@ import (
 	"github.com/martinsuchenak/rackd/internal/model"
 )
 
+// Common TCP ports to check for liveness (no special privileges required)
+var commonPorts = []int{80, 443, 22, 3389, 23, 21, 25, 53, 110, 143, 993, 995}
+
+// maxTCPPortTimeout is the maximum time to wait for a TCP connection attempt
+const maxTCPPortTimeout = 2 * time.Second
+
 // Compile-time interface check to ensure DiscoveryScanner implements discovery.Scanner
 var _ discovery.Scanner = (*DiscoveryScanner)(nil)
 
@@ -181,8 +187,8 @@ func (ds *DiscoveryScanner) ScanNetwork(ctx context.Context, networkID string, r
 }
 
 // scanHost performs basic discovery on a single host
-// OSS version: only hostname lookup, no ping/port/ARP/service scanning
-// Premium features are available in rackd-enterprise
+// OSS version: TCP-based liveness checking + hostname lookup
+// Premium features (ICMP ping, ARP, advanced port scanning, service detection, OS detection) are available in rackd-enterprise
 func (ds *DiscoveryScanner) scanHost(ctx context.Context, ip, networkID, scanID string) (*model.DiscoveredDevice, error) {
 	log.Debug("Discovering host", "ip", ip)
 
@@ -191,7 +197,7 @@ func (ds *DiscoveryScanner) scanHost(ctx context.Context, ip, networkID, scanID 
 		ID:        generateID("discovered"),
 		IP:        ip,
 		NetworkID: networkID,
-		Status:    "unknown", // Basic discovery cannot determine online status without premium scanning
+		Status:    "offline",
 		LastScanID: scanID,
 		LastSeen:  time.Now(),
 	}
@@ -201,10 +207,80 @@ func (ds *DiscoveryScanner) scanHost(ctx context.Context, ip, networkID, scanID 
 		device.Hostname = hostname
 	}
 
-	// Basic confidence score for manually/API-discovered devices
-	device.Confidence = 50 // Base confidence for basic discovery
+	// Check liveness using TCP connection attempts to common ports
+	// This works without special privileges and gives us basic online/offline status
+	openPorts := ds.checkTCPPorts(ctx, ip)
+	if len(openPorts) > 0 {
+		device.Status = "online"
+		device.OpenPorts = openPorts
+	}
+
+	// Calculate confidence score based on what we found
+	device.Confidence = ds.calculateConfidence(device)
 
 	return device, nil
+}
+
+// checkTCPPorts checks common TCP ports to determine if a host is online
+// Returns a list of open ports (no privileges required for TCP connect)
+func (ds *DiscoveryScanner) checkTCPPorts(ctx context.Context, ip string) []int {
+	var openPorts []int
+	var mu sync.Mutex
+	var wg sync.WaitGroup
+
+	// Use a semaphore to limit concurrent connections
+	sem := make(chan struct{}, 10) // Check up to 10 ports concurrently
+
+	for _, port := range commonPorts {
+		wg.Add(1)
+		go func(p int) {
+			defer wg.Done()
+			sem <- struct{}{}
+			defer func() { <-sem }()
+
+			// Check if context is cancelled
+			select {
+			case <-ctx.Done():
+				return
+			default:
+			}
+
+			address := fmt.Sprintf("%s:%d", ip, p)
+			conn, err := net.DialTimeout("tcp", address, maxTCPPortTimeout)
+			if err == nil {
+				conn.Close()
+				mu.Lock()
+				openPorts = append(openPorts, p)
+				mu.Unlock()
+				log.Debug("Port open", "ip", ip, "port", p)
+			}
+		}(port)
+	}
+
+	wg.Wait()
+	return openPorts
+}
+
+// calculateConfidence calculates a confidence score based on discovered data
+func (ds *DiscoveryScanner) calculateConfidence(device *model.DiscoveredDevice) int {
+	score := 30 // Base score for any discovered IP
+
+	if device.Hostname != "" {
+		score += 20 // Has hostname
+	}
+	if len(device.OpenPorts) > 0 {
+		score += 30 // At least one port open (device is online)
+		if len(device.OpenPorts) > 2 {
+			score += 10 // Multiple ports open increases confidence
+		}
+	}
+
+	// Cap at 100
+	if score > 100 {
+		score = 100
+	}
+
+	return score
 }
 
 // generateIPList generates all IPs in a CIDR range
@@ -262,18 +338,9 @@ func (ds *DiscoveryScanner) getHostname(ip string) (string, error) {
 	return names[0], nil
 }
 
-// getDepthFromType converts scan type to depth level
+// getDepthFromType returns scan depth (always 2 for OSS basic discovery)
 func (ds *DiscoveryScanner) getDepthFromType(scanType string) int {
-	switch scanType {
-	case "quick":
-		return 1
-	case "full":
-		return 2 // Reduced for OSS (no deep scanning)
-	case "deep":
-		return 2 // Reduced for OSS (no deep scanning)
-	default:
-		return 1
-	}
+	return 2 // OSS basic discovery always has same depth
 }
 
 // inc increments an IP address

@@ -1,7 +1,14 @@
 import Alpine from 'alpinejs';
 import { api } from './api.js';
+import { modalConfig, viewModalConfig } from './modal.js';
 
 Alpine.data('discoveryManager', () => ({
+    // Reusable modal configurations
+    viewModal: viewModalConfig('2xl'),
+    promoteModal: modalConfig('2xl'),
+    bulkPromoteModal: modalConfig('2xl'),
+    scanModal: modalConfig('md'),
+
     discoveredDevices: [],
     scans: [],
     rules: [],
@@ -10,11 +17,15 @@ Alpine.data('discoveryManager', () => ({
     get loading() { return this.localLoading; },
     saving: false,
     scanning: false,
-    showPromoteModal: false,
-    showBulkPromoteModal: false,
-    showViewModal: false,
-    showScanModal: false,
-    showRuleModal: false,
+    // For backward compatibility with existing HTML
+    get showPromoteModal() { return this.promoteModal.show; },
+    set showPromoteModal(value) { this.promoteModal.show = value; },
+    get showBulkPromoteModal() { return this.bulkPromoteModal.show; },
+    set showBulkPromoteModal(value) { this.bulkPromoteModal.show = value; },
+    get showViewModal() { return this.viewModal.show; },
+    set showViewModal(value) { this.viewModal.show = value; },
+    get showScanModal() { return this.scanModal.show; },
+    set showScanModal(value) { this.scanModal.show = value; },
     selectedDevices: new Set(),
     filters: {
         network_id: '',
@@ -45,21 +56,13 @@ Alpine.data('discoveryManager', () => ({
         domainsInput: ''
     },
     scanForm: {
-        network_id: '',
-        scan_type: 'full'
+        network_id: ''
     },
     ruleForm: {
         id: '',
         network_id: '',
         enabled: true,
         scan_interval_hours: 24,
-        scan_type: 'full',
-        max_concurrent_scans: 10,
-        timeout_seconds: 5,
-        scan_ports: true,
-        port_scan_type: 'common',
-        service_detection: true,
-        os_detection: true,
         exclude_ips: ''
     },
 
@@ -129,22 +132,19 @@ Alpine.data('discoveryManager', () => ({
         try {
             const device = await api.get(`/api/discovered/${id}`);
             device.network_name = this.networks.find(n => n.id === device.network_id)?.name || null;
-            this.currentDevice = device;
-            this.showViewModal = true;
+            this.viewModal.openWithItem(device);
         } catch (error) {
             Alpine.store('toast').notify('Failed to load device', 'error');
         }
     },
 
     closeViewModal() {
-        this.showViewModal = false;
-        this.currentDevice = {};
+        this.viewModal.close();
     },
 
     async openPromoteModal(id) {
         try {
             const device = await api.get(`/api/discovered/${id}`);
-            this.currentDevice = device;
             this.promoteForm = {
                 name: device.hostname || device.ip,
                 description: `Auto-discovered from ${device.ip}`,
@@ -156,15 +156,16 @@ Alpine.data('discoveryManager', () => ({
                 tagsInput: 'discovered',
                 domainsInput: ''
             };
-            this.showPromoteModal = true;
+            // Store current device for promoteDevice method
+            this.viewModal.currentItem = device;
+            this.promoteModal.open();
         } catch (error) {
             Alpine.store('toast').notify('Failed to load device', 'error');
         }
     },
 
     closePromoteModal() {
-        this.showPromoteModal = false;
-        this.currentDevice = {};
+        this.promoteModal.close();
         this.resetPromoteForm();
     },
 
@@ -185,7 +186,7 @@ Alpine.data('discoveryManager', () => ({
     async promoteDevice() {
         this.saving = true;
         try {
-            await api.post(`/api/discovered/${this.currentDevice.id}/promote`, this.promoteForm);
+            await api.post(`/api/discovered/${this.viewModal.currentItem.id}/promote`, this.promoteForm);
             Alpine.store('toast').notify('Device promoted successfully', 'success');
             this.closePromoteModal();
             this.loadDiscoveredDevices();
@@ -234,11 +235,11 @@ Alpine.data('discoveryManager', () => ({
             tagsInput: 'discovered',
             domainsInput: ''
         };
-        this.showBulkPromoteModal = true;
+        this.bulkPromoteModal.open();
     },
 
     closeBulkPromoteModal() {
-        this.showBulkPromoteModal = false;
+        this.bulkPromoteModal.close();
         this.selectedDevices.clear();
     },
 
@@ -246,7 +247,7 @@ Alpine.data('discoveryManager', () => ({
         this.saving = true;
         try {
             const ids = this.selectedDevicesList;
-            const devices = ids.map(id => ({
+            const devices = ids.map(() => ({
                 name: this.bulkPromoteForm.name || undefined,
                 description: this.bulkPromoteForm.description,
                 make_model: this.bulkPromoteForm.make_model,
@@ -273,18 +274,26 @@ Alpine.data('discoveryManager', () => ({
     async deleteDevice(id) {
         if (!confirm('Are you sure you want to delete this discovered device?')) return;
         try {
-            await api.deleteReq(`/api/discovered/${id}`);
+            await api.delete(`/api/discovered/${id}`);
             Alpine.store('toast').notify('Device deleted successfully', 'success');
+            // Close modal if we deleted the currently viewed device
+            if (this.viewModal.show && this.viewModal.currentItem?.id === id) {
+                this.viewModal.close();
+            }
             this.loadDiscoveredDevices();
         } catch (error) {
             Alpine.store('toast').notify('Failed to delete device', 'error');
         }
     },
 
+    deleteCurrentDevice() {
+        this.deleteDevice(this.viewModal.currentItem?.id);
+    },
+
     async bulkDelete() {
         if (!confirm(`Are you sure you want to delete ${this.selectedDevices.size} discovered device(s)?`)) return;
         try {
-            await Promise.all(this.selectedDevicesList.map(id => api.deleteReq(`/api/discovered/${id}`)));
+            await Promise.all(this.selectedDevicesList.map(id => api.delete(`/api/discovered/${id}`)));
             Alpine.store('toast').notify(`${this.selectedDevices.size} device(s) deleted successfully`, 'success');
             this.selectedDevices.clear();
             this.loadDiscoveredDevices();
@@ -293,16 +302,31 @@ Alpine.data('discoveryManager', () => ({
         }
     },
 
+    async deleteAll() {
+        const count = this.discoveredDevices.length;
+        if (count === 0) {
+            Alpine.store('toast').notify('No devices to delete', 'error');
+            return;
+        }
+        if (!confirm(`Are you sure you want to delete ALL ${count} discovered device(s)? This cannot be undone.`)) return;
+        try {
+            await Promise.all(this.discoveredDevices.map(device => api.delete(`/api/discovered/${device.id}`)));
+            Alpine.store('toast').notify(`All ${count} device(s) deleted successfully`, 'success');
+            this.loadDiscoveredDevices();
+        } catch (error) {
+            Alpine.store('toast').notify('Failed to delete all devices', 'error');
+        }
+    },
+
     openScanModal() {
         this.scanForm = {
-            network_id: this.filters.network_id || '',
-            scan_type: 'full'
+            network_id: this.filters.network_id || ''
         };
-        this.showScanModal = true;
+        this.scanModal.open();
     },
 
     closeScanModal() {
-        this.showScanModal = false;
+        this.scanModal.close();
     },
 
     async startScan() {
@@ -322,7 +346,7 @@ Alpine.data('discoveryManager', () => ({
     async deleteScan(id) {
         if (!confirm('Are you sure you want to delete this scan?')) return;
         try {
-            await api.deleteReq(`/api/discovery/scans/${id}`);
+            await api.delete(`/api/discovery/scans/${id}`);
             Alpine.store('toast').notify('Scan deleted successfully', 'success');
             this.loadScans();
         } catch (error) {
@@ -342,13 +366,6 @@ Alpine.data('discoveryManager', () => ({
                 network_id: '',
                 enabled: true,
                 scan_interval_hours: 24,
-                scan_type: 'full',
-                max_concurrent_scans: 10,
-                timeout_seconds: 5,
-                scan_ports: true,
-                port_scan_type: 'common',
-                service_detection: true,
-                os_detection: true,
                 exclude_ips: ''
             };
         }
@@ -366,13 +383,6 @@ Alpine.data('discoveryManager', () => ({
             network_id: '',
             enabled: true,
             scan_interval_hours: 24,
-            scan_type: 'full',
-            max_concurrent_scans: 10,
-            timeout_seconds: 5,
-            scan_ports: true,
-            port_scan_type: 'common',
-            service_detection: true,
-            os_detection: true,
             exclude_ips: ''
         };
     },
@@ -384,13 +394,7 @@ Alpine.data('discoveryManager', () => ({
                 network_id: this.ruleForm.network_id,
                 enabled: this.ruleForm.enabled,
                 scan_interval_hours: this.ruleForm.scan_interval_hours,
-                scan_type: this.ruleForm.scan_type,
-                max_concurrent_scans: this.ruleForm.max_concurrent_scans,
-                timeout_seconds: this.ruleForm.timeout_seconds,
-                scan_ports: this.ruleForm.scan_ports,
-                port_scan_type: this.ruleForm.port_scan_type,
-                service_detection: this.ruleForm.service_detection,
-                os_detection: this.ruleForm.os_detection,
+                scan_type: 'basic',
                 exclude_ips: this.ruleForm.exclude_ips.split(',').map(t => t.trim()).filter(t => t)
             };
 
@@ -414,7 +418,7 @@ Alpine.data('discoveryManager', () => ({
     async deleteRule(id) {
         if (!confirm('Are you sure you want to delete this rule?')) return;
         try {
-            await api.deleteReq(`/api/discovery/rules/${id}`);
+            await api.delete(`/api/discovery/rules/${id}`);
             Alpine.store('toast').notify('Rule deleted successfully', 'success');
             this.loadRules();
         } catch (error) {

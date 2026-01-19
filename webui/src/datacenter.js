@@ -1,12 +1,20 @@
 import Alpine from 'alpinejs';
 import { api } from './api.js';
+import { modalConfig, viewModalConfig } from './modal.js';
 
 Alpine.data('datacenterManager', () => ({
+    // Reusable modal configurations
+    editModal: modalConfig('lg'),
+    viewModal: viewModalConfig('lg'),
+
     get datacenters() { return Alpine.store('appData').datacenters; },
     get loading() { return Alpine.store('appData').loadingDatacenters; },
     saving: false,
-    showModal: false,
-    showViewModal: false,
+    // For backward compatibility with existing HTML
+    get showModal() { return this.editModal.show; },
+    set showModal(value) { this.editModal.show = value; },
+    get showViewModal() { return this.viewModal.show; },
+    set showViewModal(value) { this.viewModal.show = value; },
     modalTitle: 'Add Datacenter',
     currentDatacenter: {},
     form: { id: '', name: '', location: '', description: '' },
@@ -20,11 +28,11 @@ Alpine.data('datacenterManager', () => ({
     openAddModal() {
         this.modalTitle = 'Add Datacenter';
         this.resetForm();
-        this.showModal = true;
+        this.editModal.open();
     },
 
     closeModal() {
-        this.showModal = false;
+        this.editModal.close();
         this.resetForm();
     },
 
@@ -62,30 +70,29 @@ Alpine.data('datacenterManager', () => ({
 
     async viewDatacenter(id) {
         try {
-            this.currentDatacenter = await api.get(`/api/datacenters/${id}`);
-            this.showViewModal = true;
+            const datacenter = await api.get(`/api/datacenters/${id}`);
+            this.viewModal.openWithItem(datacenter);
         } catch (error) {
             Alpine.store('toast').notify('Failed to load datacenter', 'error');
         }
     },
 
     closeViewModal() {
-        this.showViewModal = false;
-        this.currentDatacenter = {};
+        this.viewModal.close();
     },
 
     editCurrentDatacenter() {
-        const dc = this.currentDatacenter;
+        const dc = this.viewModal.currentItem;
         this.prepareEditForm(dc);
-        this.closeViewModal();
-        this.showModal = true;
+        this.viewModal.close();
+        this.editModal.open();
     },
 
     async editDatacenter(id) {
         try {
             const datacenter = await api.get(`/api/datacenters/${id}`);
             this.prepareEditForm(datacenter);
-            this.showModal = true;
+            this.editModal.open();
         } catch (error) {
             Alpine.store('toast').notify('Failed to load datacenter', 'error');
         }
@@ -120,8 +127,8 @@ Alpine.data('datacenterManager', () => ({
             Alpine.store('toast').notify('Datacenter deleted successfully', 'success');
             Alpine.store('appData').loadDatacenters(true);
             window.dispatchEvent(new CustomEvent('refresh-datacenters'));
-            if (this.showViewModal && this.currentDatacenter.id === id) {
-                this.closeViewModal();
+            if (this.viewModal.show && this.viewModal.currentItem?.id === id) {
+                this.viewModal.close();
             }
         } catch (error) {
             Alpine.store('toast').notify('Failed to delete datacenter', 'error');
@@ -129,6 +136,6 @@ Alpine.data('datacenterManager', () => ({
     },
 
     deleteCurrentDatacenter() {
-        this.deleteDatacenter(this.currentDatacenter.id);
+        this.deleteDatacenter(this.viewModal.currentItem?.id);
     }
 }));

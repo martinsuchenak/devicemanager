@@ -70,91 +70,25 @@ func NewSQLiteStorage(dataDir string) (*SQLiteStorage, error) {
 	return ss, nil
 }
 
-// initSchema creates the database schema and runs migrations
+// initSchema creates the database schema from schema.sql
 func (ss *SQLiteStorage) initSchema() error {
-	// Check if database is already initialized by checking for schema_migrations table
+	// Check if database is already initialized by checking for datacenters table
 	var tableName string
-	err := ss.db.QueryRow("SELECT name FROM sqlite_master WHERE type='table' AND name='schema_migrations'").Scan(&tableName)
+	err := ss.db.QueryRow("SELECT name FROM sqlite_master WHERE type='table' AND name='datacenters'").Scan(&tableName)
 	if err == sql.ErrNoRows {
-		// No schema_migrations table - check if devices table exists (legacy database)
-		var hasDevicesTable string
-		err := ss.db.QueryRow("SELECT name FROM sqlite_master WHERE type='table' AND name='devices'").Scan(&hasDevicesTable)
-
-		if err == sql.ErrNoRows {
-			// Fresh database - run schema.sql
-			schema, err := schemaFS.ReadFile("schema.sql")
-			if err != nil {
-				return fmt.Errorf("reading schema: %w", err)
-			}
-
-			_, err = ss.db.Exec(string(schema))
-			if err != nil {
-				return fmt.Errorf("executing schema.sql: %w", err)
-			}
-		} else {
-			// Legacy database exists - create schema_migrations table at version 1
-			// so migrations will handle upgrading the schema
-			_, err = ss.db.Exec(`
-				CREATE TABLE schema_migrations (
-					version INTEGER PRIMARY KEY,
-					applied_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-				)
-			`)
-			if err != nil {
-				return fmt.Errorf("creating migrations table for legacy db: %w", err)
-			}
-			_, err = ss.db.Exec(`INSERT INTO schema_migrations (version) VALUES (1)`)
-			if err != nil {
-				return fmt.Errorf("setting initial migration version: %w", err)
-			}
+		// Fresh database - run schema.sql
+		schema, err := schemaFS.ReadFile("schema.sql")
+		if err != nil {
+			return fmt.Errorf("reading schema: %w", err)
 		}
-	}
 
-	// Run migrations if needed
-	if err := ss.MigrateToV2(); err != nil {
-		return fmt.Errorf("running MigrateToV2: %w", err)
-	}
+		_, err = ss.db.Exec(string(schema))
+		if err != nil {
+			return fmt.Errorf("executing schema.sql: %w", err)
+		}
 
-	if err := ss.MigrateToV3(); err != nil {
-		return fmt.Errorf("running MigrateToV3: %w", err)
+		log.Info("Database initialized from schema.sql")
 	}
-
-	if err := ss.MigrateToV4(); err != nil {
-		return fmt.Errorf("running MigrateToV4: %w", err)
-	}
-
-	if err := ss.MigrateToV5(); err != nil {
-		return fmt.Errorf("running MigrateToV5: %w", err)
-	}
-
-	if err := ss.MigrateToV6(); err != nil {
-		return fmt.Errorf("running MigrateToV6: %w", err)
-	}
-
-	if err := ss.MigrateToV7(); err != nil {
-		return fmt.Errorf("running MigrateToV7: %w", err)
-	}
-
-	if err := ss.MigrateToV8(); err != nil {
-		return fmt.Errorf("running MigrateToV8: %w", err)
-	}
-
-	if err := ss.MigrateToV9(); err != nil {
-		return fmt.Errorf("running MigrateToV9: %w", err)
-	}
-
-	if err := ss.MigrateToV10(); err != nil {
-		return fmt.Errorf("running MigrateToV10: %w", err)
-	}
-
-	if err := ss.MigrateToV11(); err != nil {
-		return fmt.Errorf("running MigrateToV11: %w", err)
-	}
-
-	if err := ss.MigrateToV12(); err != nil {
-		return fmt.Errorf("running MigrateToV12: %w", err)
-	}
-
 	return nil
 }
 

@@ -1,7 +1,12 @@
 import Alpine from 'alpinejs';
 import { api } from './api.js';
+import { modalConfig, viewModalConfig } from './modal.js';
 
 Alpine.data('networkManager', () => ({
+    // Reusable modal configurations
+    editModal: modalConfig('lg'),
+    viewModal: viewModalConfig('lg'),
+
     get networks() {
         // Enrich networks with datacenter names on the fly
         return Alpine.store('appData').networks.map(n => ({
@@ -12,8 +17,11 @@ Alpine.data('networkManager', () => ({
     get datacenters() { return Alpine.store('appData').datacenters; },
     get loading() { return Alpine.store('appData').loadingNetworks; },
     saving: false,
-    showModal: false,
-    showViewModal: false,
+    // For backward compatibility with existing HTML
+    get showModal() { return this.editModal.show; },
+    set showModal(value) { this.editModal.show = value; },
+    get showViewModal() { return this.viewModal.show; },
+    set showViewModal(value) { this.viewModal.show = value; },
     modalTitle: 'Add Network',
     currentNetwork: {},
     form: { id: '', name: '', subnet: '', datacenter_id: '', description: '' },
@@ -38,11 +46,11 @@ Alpine.data('networkManager', () => ({
     openAddModal() {
         this.modalTitle = 'Add Network';
         this.resetForm();
-        this.showModal = true;
+        this.editModal.open();
     },
 
     closeModal() {
-        this.showModal = false;
+        this.editModal.close();
         this.resetForm();
     },
 
@@ -86,30 +94,28 @@ Alpine.data('networkManager', () => ({
         try {
             const network = await api.get(`/api/networks/${id}`);
             network.datacenter_name = this.datacenters.find(dc => dc.id === network.datacenter_id)?.name || null;
-            this.currentNetwork = network;
-            this.showViewModal = true;
+            this.viewModal.openWithItem(network);
         } catch (error) {
             Alpine.store('toast').notify('Failed to load network', 'error');
         }
     },
 
     closeViewModal() {
-        this.showViewModal = false;
-        this.currentNetwork = {};
+        this.viewModal.close();
     },
 
     editCurrentNetwork() {
-        const network = this.currentNetwork;
+        const network = this.viewModal.currentItem;
         this.prepareEditForm(network);
-        this.closeViewModal();
-        this.showModal = true;
+        this.viewModal.close();
+        this.editModal.open();
     },
 
     async editNetwork(id) {
         try {
             const network = await api.get(`/api/networks/${id}`);
             this.prepareEditForm(network);
-            this.showModal = true;
+            this.editModal.open();
         } catch (error) {
             Alpine.store('toast').notify('Failed to load network', 'error');
         }
@@ -144,8 +150,8 @@ Alpine.data('networkManager', () => ({
             Alpine.store('toast').notify('Network deleted successfully', 'success');
             Alpine.store('appData').loadNetworks(true);
             window.dispatchEvent(new CustomEvent('refresh-networks'));
-            if (this.showViewModal && this.currentNetwork.id === id) {
-                this.closeViewModal();
+            if (this.viewModal.show && this.viewModal.currentItem?.id === id) {
+                this.viewModal.close();
             }
         } catch (error) {
             Alpine.store('toast').notify('Failed to delete network', 'error');
@@ -153,6 +159,6 @@ Alpine.data('networkManager', () => ({
     },
 
     deleteCurrentNetwork() {
-        this.deleteNetwork(this.currentNetwork.id);
+        this.deleteNetwork(this.viewModal.currentItem?.id);
     }
 }));

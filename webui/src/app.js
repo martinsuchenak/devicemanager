@@ -9,6 +9,35 @@ import './discovery.js';
 
 Alpine.plugin(focus);
 
+// Simple hash-based router
+Alpine.store('router', {
+    currentView: 'devices',
+    routes: ['devices', 'networks', 'datacenters', 'discovery'],
+
+    init() {
+        // Read initial hash from URL
+        const hash = window.location.hash.slice(1); // Remove the #
+        if (hash && this.routes.includes(hash)) {
+            this.currentView = hash;
+        }
+
+        // Listen for hash changes (back/forward buttons)
+        window.addEventListener('hashchange', () => {
+            const hash = window.location.hash.slice(1);
+            if (hash && this.routes.includes(hash)) {
+                this.currentView = hash;
+            }
+        });
+    },
+
+    navigate(view) {
+        if (this.routes.includes(view)) {
+            this.currentView = view;
+            window.location.hash = view;
+        }
+    }
+});
+
 Alpine.store('appData', {
     datacenters: [],
     networks: [],
@@ -183,4 +212,6 @@ async function loadEnterpriseFeatures() {
 
 // Load enterprise features after Alpine is ready
 Alpine.start();
+// Initialize router after Alpine is ready
+Alpine.store('router').init();
 loadEnterpriseFeatures();

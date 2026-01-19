@@ -99,6 +99,7 @@ Priority: CLI Flags > .env > Env Vars > Defaults.
 ### Architecture Notes
 - **Storage:** Use `internal/storage`. Relationships (`depends_on`, `connected_to`) are supported.
 - **Frontend:** Embedded in Go binary. Run `make ui-build` after editing `webui/`.
+  - **UI Guidelines:** See `UI_GUIDELINES.md` for comprehensive UI/UX standards, modal patterns, form patterns, and consistency rules.
 - **MCP:** Tools available for device management (`device_save`, `device_get`, etc.) and relationships.
 
 ## Pre-Commit Checklist
@@ -109,6 +110,6 @@ Before considering a task complete, verify:
 - [ ] Storage layer updated to handle new fields
 - [ ] CLI flags added for new user-facing fields
 - [ ] MCP server tools updated for new operations
-- [ ] Web UI updated for user-facing changes
+- [ ] Web UI updated for user-facing changes (follow `UI_GUIDELINES.md`)
 - [ ] Tests pass (`make test`)
 - [ ] Build succeeds (`make build`)

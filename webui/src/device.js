@@ -1,15 +1,23 @@
 import Alpine from 'alpinejs';
 import { api } from './api.js';
+import { modalConfig, viewModalConfig } from './modal.js';
 
 Alpine.data('deviceManager', () => ({
+    // Reusable modal configurations
+    editModal: modalConfig('3xl'),
+    viewModal: viewModalConfig('lg'),
+
     devices: [],
     get datacenters() { return Alpine.store('appData').datacenters; },
     get networks() { return Alpine.store('appData').networks; },
     localLoading: false,
     get loading() { return this.localLoading; }, // Devices loading is local
     saving: false,
-    showModal: false,
-    showViewModal: false,
+    // For backward compatibility with existing HTML
+    get showModal() { return this.editModal.show; },
+    set showModal(value) { this.editModal.show = value; },
+    get showViewModal() { return this.viewModal.show; },
+    set showViewModal(value) { this.viewModal.show = value; },
     searchQuery: '',
     modalTitle: 'Add Device',
     currentDevice: {},
@@ -96,12 +104,12 @@ Alpine.data('deviceManager', () => ({
         this.modalTitle = 'Add Device';
         this.resetForm();
         this.$nextTick(() => {
-            this.showModal = true;
+            this.editModal.open();
         });
     },
 
     closeModal() {
-        this.showModal = false;
+        this.editModal.close();
         this.resetForm();
     },
 
@@ -183,32 +191,30 @@ Alpine.data('deviceManager', () => ({
                     network_name: this.networks.find(n => n.id === addr.network_id)?.name || null
                 }));
             }
-            this.currentDevice = device;
-            this.showViewModal = true;
+            this.viewModal.openWithItem(device);
         } catch (error) {
             Alpine.store('toast').notify('Failed to load device', 'error');
         }
     },
 
     closeViewModal() {
-        this.showViewModal = false;
-        this.currentDevice = {};
+        this.viewModal.close();
     },
 
     async editCurrentDevice() {
         await this.ensureDependencies();
-        const device = this.currentDevice;
-        await this.prepareEditForm(device); // Await form preparation including pool fetches
-        this.closeViewModal();
-        this.showModal = true;
+        const device = this.viewModal.currentItem;
+        await this.prepareEditForm(device);
+        this.viewModal.close();
+        this.editModal.open();
     },
 
     async editDevice(id) {
         try {
             await this.ensureDependencies();
             const device = await api.get(`/api/devices/${id}`);
-            await this.prepareEditForm(device); // Await form preparation including pool fetches
-            this.showModal = true;
+            await this.prepareEditForm(device);
+            this.editModal.open();
         } catch (error) {
             Alpine.store('toast').notify('Failed to load device', 'error');
         }
@@ -251,8 +257,8 @@ Alpine.data('deviceManager', () => ({
             await api.delete(`/api/devices/${id}`);
             Alpine.store('toast').notify('Device deleted successfully', 'success');
             this.loadDevices();
-            if (this.showViewModal && this.currentDevice.id === id) {
-                this.closeViewModal();
+            if (this.viewModal.show && this.viewModal.currentItem?.id === id) {
+                this.viewModal.close();
             }
         } catch (error) {
             Alpine.store('toast').notify('Failed to delete device', 'error');
@@ -260,7 +266,7 @@ Alpine.data('deviceManager', () => ({
     },
 
     deleteCurrentDevice() {
-        this.deleteDevice(this.currentDevice.id);
+        this.deleteDevice(this.viewModal.currentItem?.id);
     },
 
     // Pool Support
